@@ -902,6 +902,7 @@ Always use this date for "today", "now", date calculations. Never use 2025 dates
     }
     else if (toolName === 'create_and_send') {
       const n8nWebhook = 'https://ckmarketingauto.app.n8n.cloud/webhook/launch-campaign-v2';
+      const campaignDbId = `agent_${Date.now()}`;
       const resp = await fetch(n8nWebhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -913,11 +914,40 @@ Always use this date for "today", "now", date calculations. Never use 2025 dates
           pn_title: toolInput.pn_title,
           pn_body: toolInput.pn_body,
           deep_link: toolInput.deep_link,
-          campaign_db_id: `agent_${Date.now()}`,
+          campaign_db_id: campaignDbId,
           created_by: 'Campaign Agent'
         })
       });
       const result = await resp.json();
+
+      // Save to Supabase regardless of result so it appears in Lovable
+      try {
+        await callEdge({
+          action: 'create_campaign',
+          campaign: {
+            date: todayIST(),
+            time: new Date().toTimeString().slice(0,5),
+            channel: toolInput.channel || 'push',
+            brand: toolInput.brand,
+            segment_name: toolInput.segment_name,
+            segment_json: toolInput.targeting_json,
+            pn_title: toolInput.pn_title,
+            pn_body: toolInput.pn_body,
+            deep_link: toolInput.deep_link,
+            status: result.status === 'success' ? 'Sent' : 'Failed',
+            created_by_name: 'Campaign Agent',
+            notes: 'Created via Campaign Agent chatbot',
+            campaign_id_ct: result.campaign_id || result.id || '',
+            android_reach: result.android_reach || 0,
+            ios_reach: result.ios_reach || 0,
+            ct_campaign_url: result.url || ''
+          }
+        });
+      } catch(e) {
+        // Edge function may not have create_campaign yet — will be added tomorrow via Lovable
+        console.log('Supabase save skipped (create_campaign not yet in edge function):', e.message);
+      }
+
       return result;
     }
 
@@ -1109,11 +1139,13 @@ Always use this date for "today", "now", date calculations. Never use 2025 dates
         const toolResults = [];
 
         for (const block of content) {
-          if (block.type === 'text') {
+          if (block.type === 'text' && !hasToolUse) {
+            // Only collect text if no tool use has happened yet
             finalResponse += block.text;
           }
           if (block.type === 'tool_use') {
             hasToolUse = true;
+            finalResponse = ''; // Clear any text before tool use — tool result is the response
 
             // Show tool call indicator
             toolCallsHtml += `
@@ -1136,6 +1168,13 @@ Always use this date for "today", "now", date calculations. Never use 2025 dates
           }
         }
 
+        // After tool results, capture Claude's follow-up text summary
+        if (hasToolUse && data.stop_reason !== 'tool_use') {
+          for (const block of content) {
+            if (block.type === 'text') finalResponse += block.text;
+          }
+        }
+
         if (hasToolUse) {
           // Add assistant message with tool use to history
           messages.push({ role: 'assistant', content: content });
@@ -1143,6 +1182,8 @@ Always use this date for "today", "now", date calculations. Never use 2025 dates
           messages.push({ role: 'user', content: toolResults });
           // Continue loop if Claude wants to process results
           continueLoop = data.stop_reason === 'tool_use';
+          // Reset finalResponse for next iteration — only show tool cards
+          finalResponse = '';
         } else {
           continueLoop = false;
         }
