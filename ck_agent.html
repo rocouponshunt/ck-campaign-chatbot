@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CK Campaign Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #FF6B35;
+    --orange-dark: #E55A25;
+    --orange-glow: rgba(255, 107, 53, 0.15);
+    --blue: #1B3A6B;
+    --blue-dark: #0F2347;
+    --bg: #0A0E1A;
+    --surface: #111827;
+    --surface-2: #1A2335;
+    --border: rgba(255,255,255,0.06);
+    --border-active: rgba(255, 107, 53, 0.3);
+    --text: #F0F4FF;
+    --text-muted: rgba(240, 244, 255, 0.45);
+    --text-dim: rgba(240, 244, 255, 0.25);
+    --user-bubble: #1B3A6B;
+    --agent-bubble: #111827;
+    --success: #10B981;
+    --error: #EF4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,107,53,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,107,53,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Header */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10, 14, 26, 0.95);
+    backdrop-filter: blur(20px);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    color: white;
+    box-shadow: 0 4px 12px rgba(255,107,53,0.3);
+  }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .logo-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse-dot 2s infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .status-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .clear-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .clear-btn:hover {
+    border-color: var(--border-active);
+    color: var(--orange);
+  }
+
+  /* Suggestions bar */
+  .suggestions {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10, 14, 26, 0.8);
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+  }
+
+  .suggestions::-webkit-scrollbar { display: none; }
+
+  .suggestion-chip {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .suggestion-chip:hover {
+    border-color: var(--border-active);
+    color: var(--orange);
+    background: var(--orange-glow);
+  }
+
+  /* Messages area */
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+    scroll-behavior: smooth;
+  }
+
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  /* Welcome screen */
+  .welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    text-align: center;
+    padding: 40px 24px;
+    gap: 16px;
+  }
+
+  .welcome-icon {
+    width: 72px;
+    height: 72px;
+    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    box-shadow: 0 8px 32px rgba(255,107,53,0.3);
+    margin-bottom: 8px;
+  }
+
+  .welcome h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .welcome h2 span { color: var(--orange); }
+
+  .welcome p {
+    font-size: 15px;
+    color: var(--text-muted);
+    max-width: 400px;
+    line-height: 1.6;
+  }
+
+  .welcome-examples {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 16px;
+    max-width: 500px;
+    width: 100%;
+  }
+
+  .example-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+
+  .example-card:hover {
+    border-color: var(--border-active);
+    background: var(--orange-glow);
+    transform: translateY(-2px);
+  }
+
+  .example-card .ex-icon { font-size: 18px; margin-bottom: 8px; }
+  .example-card .ex-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .example-card .ex-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
+  /* Message bubbles */
+  .message {
+    display: flex;
+    gap: 12px;
+    animation: fadeInUp 0.3s ease;
+    max-width: 800px;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .message.user { flex-direction: row-reverse; align-self: flex-end; }
+  .message.agent { align-self: flex-start; }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: 'Syne', sans-serif;
+  }
+
+  .message.user .avatar {
+    background: linear-gradient(135deg, var(--blue), #2A5298);
+    color: white;
+    font-size: 12px;
+  }
+
+  .message.agent .avatar {
+    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+    color: white;
+    box-shadow: 0 4px 12px rgba(255,107,53,0.25);
+  }
+
+  .bubble {
+    padding: 12px 16px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.65;
+    max-width: 600px;
+  }
+
+  .message.user .bubble {
+    background: var(--user-bubble);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px 4px 14px 14px;
+    color: var(--text);
+  }
+
+  .message.agent .bubble {
+    background: var(--agent-bubble);
+    border: 1px solid var(--border);
+    border-radius: 4px 14px 14px 14px;
+    color: var(--text);
+  }
+
+  /* Markdown-like styling inside bubbles */
+  .bubble strong { color: var(--orange); font-weight: 600; }
+  .bubble em { color: var(--text-muted); font-style: italic; }
+
+  .bubble .stat-block {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--orange);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 10px 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+  }
+
+  .bubble .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .bubble .stat-row:last-child { border-bottom: none; }
+  .bubble .stat-label { color: var(--text-muted); font-size: 12px; }
+  .bubble .stat-value { color: var(--text); font-weight: 500; }
+  .bubble .stat-value.highlight { color: var(--orange); }
+
+  .bubble .campaign-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin: 8px 0;
+    transition: border-color 0.2s;
+  }
+
+  .bubble .campaign-card:hover { border-color: var(--border-active); }
+
+  .bubble .campaign-title { font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 6px; }
+  .bubble .campaign-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .bubble .campaign-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-family: 'DM Mono', monospace;
+  }
+  .bubble .tag-sent { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.2); }
+  .bubble .tag-draft { background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border); }
+  .bubble .tag-approved { background: rgba(59,130,246,0.15); color: #60A5FA; border: 1px solid rgba(59,130,246,0.2); }
+  .bubble .tag-failed { background: rgba(239,68,68,0.15); color: var(--error); border: 1px solid rgba(239,68,68,0.2); }
+  .bubble .tag-pending { background: rgba(245,158,11,0.15); color: #FBBF24; border: 1px solid rgba(245,158,11,0.2); }
+  .bubble .tag-push { background: rgba(139,92,246,0.15); color: #A78BFA; border: 1px solid rgba(139,92,246,0.2); }
+
+  .bubble .ct-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--orange);
+    text-decoration: none;
+    font-size: 12px;
+    margin-top: 6px;
+    transition: opacity 0.2s;
+  }
+
+  .bubble .ct-link:hover { opacity: 0.7; }
+
+  .bubble .action-result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin: 8px 0;
+  }
+
+  .bubble .action-result.success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); color: var(--success); }
+  .bubble .action-result.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: var(--error); }
+
+  /* Typing indicator */
+  .typing {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    animation: fadeInUp 0.3s ease;
+  }
+
+  .typing-bubble {
+    background: var(--agent-bubble);
+    border: 1px solid var(--border);
+    border-radius: 4px 14px 14px 14px;
+    padding: 14px 18px;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .typing-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--orange);
+    border-radius: 50%;
+    animation: typing-bounce 1.2s infinite;
+  }
+
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* Tool call indicator */
+  .tool-call {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin: 4px 0;
+  }
+
+  .tool-call-icon {
+    width: 18px;
+    height: 18px;
+    background: var(--orange-glow);
+    border: 1px solid var(--border-active);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+  }
+
+  .tool-call-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--orange);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-left: auto;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Input area */
+  .input-area {
+    position: relative;
+    z-index: 10;
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--border);
+    background: rgba(10, 14, 26, 0.95);
+    backdrop-filter: blur(20px);
+    flex-shrink: 0;
+  }
+
+  .input-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 12px 16px;
+    transition: border-color 0.2s;
+  }
+
+  .input-wrapper:focus-within {
+    border-color: var(--border-active);
+    box-shadow: 0 0 0 3px var(--orange-glow);
+  }
+
+  textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    resize: none;
+    max-height: 120px;
+    min-height: 24px;
+    line-height: 1.6;
+  }
+
+  textarea::placeholder { color: var(--text-dim); }
+
+  .send-btn {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(255,107,53,0.3);
+  }
+
+  .send-btn:hover { transform: scale(1.05); box-shadow: 0 4px 16px rgba(255,107,53,0.4); }
+  .send-btn:active { transform: scale(0.95); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .send-btn svg { width: 16px; height: 16px; fill: white; }
+
+  .input-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Scrollbar */
+  .messages::-webkit-scrollbar { width: 3px; }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .welcome-examples { grid-template-columns: 1fr; }
+    header { padding: 12px 16px; }
+    .messages { padding: 16px; }
+    .input-area { padding: 12px 16px 16px; }
+    .suggestions { padding: 8px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">CK</div>
+    <div class="logo-text">
+      <span class="logo-title">Campaign Agent</span>
+      <span class="logo-sub">CashKaro · Powered by Claude</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-dot"></div>
+    <span class="status-text">Connected</span>
+    <button class="clear-btn" onclick="clearChat()">Clear chat</button>
+  </div>
+</header>
+
+<div class="suggestions">
+  <div class="suggestion-chip" onclick="sendSuggestion('Stats today')">📊 Stats today</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('Stats this week')">📈 Stats this week</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('Show sent campaigns today')">✅ Sent today</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('Show pending approval campaigns')">⏳ Pending approval</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('Show all draft campaigns')">📝 Drafts</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('Show campaigns for Myntra')">🛍️ Myntra campaigns</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('Stats this month')">📅 This month</div>
+</div>
+
+<div class="messages" id="messages">
+  <div class="welcome" id="welcome">
+    <div class="welcome-icon">⚡</div>
+    <h2>Hey Rohit, what are we <span>launching</span> today?</h2>
+    <p>Ask me about campaign stats, approve or cancel campaigns, check reach numbers, or fire a campaign right now.</p>
+    <div class="welcome-examples">
+      <div class="example-card" onclick="sendSuggestion('Stats today')">
+        <div class="ex-icon">📊</div>
+        <div class="ex-title">Check Stats</div>
+        <div class="ex-desc">Today's campaigns, reach numbers, success rate</div>
+      </div>
+      <div class="example-card" onclick="sendSuggestion('Show pending approval campaigns')">
+        <div class="ex-icon">✅</div>
+        <div class="ex-title">Approve Campaigns</div>
+        <div class="ex-desc">Review and approve pending campaigns</div>
+      </div>
+      <div class="example-card" onclick="sendSuggestion('Show sent campaigns today')">
+        <div class="ex-icon">🚀</div>
+        <div class="ex-title">Campaign History</div>
+        <div class="ex-desc">View sent campaigns and performance</div>
+      </div>
+      <div class="example-card" onclick="sendSuggestion('Show campaigns for brand Myntra')">
+        <div class="ex-icon">🎯</div>
+        <div class="ex-title">Filter by Brand</div>
+        <div class="ex-desc">Find campaigns for specific retailers</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="input-area">
+  <div class="input-wrapper">
+    <textarea
+      id="input"
+      placeholder="Ask anything... 'stats this week', 'approve campaign abc123', 'show Myntra campaigns'"
+      rows="1"
+      onkeydown="handleKeydown(event)"
+      oninput="autoResize(this)"
+    ></textarea>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+  <div class="input-hint">Enter to send · Shift+Enter for new line</div>
+</div>
+
+<script>
+  // ============================================================
+  // CONFIG
+  // ============================================================
+  const CLAUDE_PROXY = 'https://vipmepzpxmmwhfarflaf.supabase.co/functions/v1/claude-proxy';
+  const BOT_SECRET = 'ck_slack_bot_2026';
+  const EDGE_API = 'https://vipmepzpxmmwhfarflaf.supabase.co/functions/v1/slack-bot-api';
+
+  // ============================================================
+  // STATE
+  // ============================================================
+  let conversationHistory = [];
+  let isLoading = false;
+
+  // ============================================================
+  // TOOLS
+  // ============================================================
+  const TOOLS = [
+    {
+      name: "get_campaigns",
+      description: "Get list of campaigns. Filter by status, date, brand.",
+      input_schema: {
+        type: "object",
+        properties: {
+          status: { type: "string", description: "Filter by status: Draft, Approved, Sent, Failed, Pending Review" },
+          date: { type: "string", description: "Filter by date YYYY-MM-DD" },
+          brand: { type: "string", description: "Filter by brand name" },
+          limit: { type: "number", description: "Number of results, default 10" }
+        }
+      }
+    },
+    {
+      name: "get_stats",
+      description: "Get campaign statistics for a time period.",
+      input_schema: {
+        type: "object",
+        properties: {
+          period: { type: "string", description: "today, this_week, or this_month" }
+        },
+        required: ["period"]
+      }
+    },
+    {
+      name: "approve_campaign",
+      description: "Approve a pending campaign by its ID.",
+      input_schema: {
+        type: "object",
+        properties: {
+          campaign_id: { type: "string", description: "Supabase campaign UUID" }
+        },
+        required: ["campaign_id"]
+      }
+    },
+    {
+      name: "cancel_campaign",
+      description: "Cancel an approved or pending campaign, changes it back to Draft.",
+      input_schema: {
+        type: "object",
+        properties: {
+          campaign_id: { type: "string", description: "Supabase campaign UUID" }
+        },
+        required: ["campaign_id"]
+      }
+    },
+    {
+      name: "fire_campaign_now",
+      description: "Send a campaign immediately to CleverTap right now.",
+      input_schema: {
+        type: "object",
+        properties: {
+          campaign_id: { type: "string", description: "Supabase campaign UUID" }
+        },
+        required: ["campaign_id"]
+      }
+    }
+  ];
+
+  const SYSTEM_PROMPT = `You are CK Campaign Agent, an AI assistant for CashKaro's marketing team.
+You help manage push notification campaigns via a chat interface.
+
+Your capabilities:
+- Check campaign stats (today, this week, this month)
+- List campaigns filtered by status, brand, date
+- Approve pending campaigns
+- Cancel campaigns
+- Fire campaigns immediately
+
+When showing campaign lists, include: brand, title, status, date/time, reach if available, and the campaign ID.
+When showing stats, format numbers clearly with Indian number format (1,37,180).
+Always confirm before firing campaigns — ask "Are you sure you want to fire campaign [title] to [reach] users?"
+Be concise and helpful. Use emojis sparingly for clarity.
+When a user asks to approve/cancel/fire by name instead of ID, first call get_campaigns to find the ID.`;
+
+  // ============================================================
+  // EDGE API CALL
+  // ============================================================
+  async function callEdge(body) {
+    const resp = await fetch(EDGE_API, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bot-secret': BOT_SECRET
+      },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) throw new Error(`Edge API error: ${resp.status}`);
+    return await resp.json();
+  }
+
+  // ============================================================
+  // TOOL EXECUTION
+  // ============================================================
+  async function executeTool(toolName, toolInput) {
+    if (toolName === 'get_campaigns') {
+      return await callEdge({
+        action: 'get_campaigns',
+        filters: {
+          status: toolInput.status,
+          date: toolInput.date,
+          brand: toolInput.brand,
+          limit: toolInput.limit || 10
+        }
+      });
+    }
+    else if (toolName === 'get_stats') {
+      return await callEdge({ action: 'get_stats', period: toolInput.period });
+    }
+    else if (toolName === 'approve_campaign') {
+      return await callEdge({ action: 'approve_campaign', campaign_id: toolInput.campaign_id });
+    }
+    else if (toolName === 'cancel_campaign') {
+      return await callEdge({ action: 'cancel_campaign', campaign_id: toolInput.campaign_id });
+    }
+    else if (toolName === 'fire_campaign_now') {
+      const detail = await callEdge({ action: 'get_campaign_detail', campaign_id: toolInput.campaign_id });
+      if (!detail || !detail.id) return { error: 'Campaign not found' };
+
+      const n8nWebhook = 'https://ckmarketingauto.app.n8n.cloud/webhook/launch-campaign-v2';
+      const resp = await fetch(n8nWebhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: detail.channel,
+          brand: detail.brand,
+          segment_name: detail.segment_name,
+          targeting_json: detail.segment_json,
+          pn_title: detail.pn_title,
+          pn_body: detail.pn_body,
+          deep_link: detail.deep_link,
+          campaign_db_id: detail.id,
+          created_by: detail.created_by_name
+        })
+      });
+      const result = await resp.json();
+
+      if (result.status === 'success') {
+        await callEdge({
+          action: 'update_campaign_after_send',
+          campaign_id: detail.id,
+          campaign_id_ct: result.campaign_id,
+          android_reach: result.android_reach,
+          ios_reach: result.ios_reach,
+          ct_campaign_url: result.url
+        });
+      }
+      return result;
+    }
+    return { error: 'Unknown tool' };
+  }
+
+  // ============================================================
+  // RENDER TOOL RESULT AS RICH HTML
+  // ============================================================
+  function renderToolResult(toolName, toolInput, result) {
+    if (toolName === 'get_stats') {
+      const total = (result.total_android_reach || 0) + (result.total_ios_reach || 0);
+      return `
+        <div class="stat-block">
+          <div class="stat-row"><span class="stat-label">Period</span><span class="stat-value">${(toolInput.period||'').replace(/_/g,' ')}</span></div>
+          <div class="stat-row"><span class="stat-label">Total Campaigns</span><span class="stat-value highlight">${result.total_campaigns || 0}</span></div>
+          <div class="stat-row"><span class="stat-label">Successfully Sent</span><span class="stat-value">${result.sent || 0}</span></div>
+          <div class="stat-row"><span class="stat-label">Pending Approval</span><span class="stat-value">${result.pending || 0}</span></div>
+          <div class="stat-row"><span class="stat-label">Failed</span><span class="stat-value">${result.failed || 0}</span></div>
+          <div class="stat-row"><span class="stat-label">Total Reach</span><span class="stat-value highlight">${(total).toLocaleString('en-IN')}</span></div>
+          <div class="stat-row"><span class="stat-label">Android</span><span class="stat-value">${(result.total_android_reach||0).toLocaleString('en-IN')}</span></div>
+          <div class="stat-row"><span class="stat-label">iOS</span><span class="stat-value">${(result.total_ios_reach||0).toLocaleString('en-IN')}</span></div>
+        </div>`;
+    }
+
+    if (toolName === 'get_campaigns') {
+      const campaigns = result.campaigns || [];
+      if (!campaigns.length) return '<em>No campaigns found.</em>';
+      return campaigns.map(c => {
+        const reach = (c.android_reach || 0) + (c.ios_reach || 0);
+        const statusClass = {
+          'Sent': 'tag-sent', 'Draft': 'tag-draft', 'Approved': 'tag-approved',
+          'Failed': 'tag-failed', 'Pending Review': 'tag-pending'
+        }[c.status] || 'tag-draft';
+        return `
+          <div class="campaign-card">
+            <div class="campaign-title">${c.brand} — ${c.pn_title}</div>
+            <div class="campaign-meta">
+              <span class="campaign-tag ${statusClass}">${c.status}</span>
+              <span class="campaign-tag tag-push">${c.channel || 'push'}</span>
+              <span class="campaign-tag tag-draft">${c.scheduled_date || ''} ${c.scheduled_time || ''}</span>
+              ${reach > 0 ? `<span class="campaign-tag tag-sent">Reach: ${reach.toLocaleString('en-IN')}</span>` : ''}
+            </div>
+            ${c.ct_campaign_url ? `<a href="${c.ct_campaign_url}" target="_blank" class="ct-link">↗ View in CleverTap</a>` : ''}
+            <div style="font-size:10px;color:var(--text-dim);margin-top:6px;font-family:'DM Mono',monospace">ID: ${c.id}</div>
+          </div>`;
+      }).join('');
+    }
+
+    if (toolName === 'approve_campaign') {
+      return result.success
+        ? `<div class="action-result success">✅ Campaign approved successfully! It will fire at the scheduled time.</div>`
+        : `<div class="action-result error">❌ Failed to approve: ${result.error || 'Unknown error'}</div>`;
+    }
+
+    if (toolName === 'cancel_campaign') {
+      return result.success
+        ? `<div class="action-result success">✅ Campaign cancelled and moved back to Draft.</div>`
+        : `<div class="action-result error">❌ Failed to cancel: ${result.error || 'Unknown error'}</div>`;
+    }
+
+    if (toolName === 'fire_campaign_now') {
+      if (result.status === 'success') {
+        const total = (result.android_reach || 0) + (result.ios_reach || 0);
+        return `
+          <div class="action-result success">🚀 Campaign fired successfully!</div>
+          <div class="stat-block">
+            <div class="stat-row"><span class="stat-label">CT Campaign ID</span><span class="stat-value highlight">${result.campaign_id}</span></div>
+            <div class="stat-row"><span class="stat-label">Android Reach</span><span class="stat-value">${(result.android_reach||0).toLocaleString('en-IN')}</span></div>
+            <div class="stat-row"><span class="stat-label">iOS Reach</span><span class="stat-value">${(result.ios_reach||0).toLocaleString('en-IN')}</span></div>
+            <div class="stat-row"><span class="stat-label">Total</span><span class="stat-value highlight">${total.toLocaleString('en-IN')}</span></div>
+          </div>
+          ${result.url ? `<a href="${result.url}" target="_blank" class="ct-link">↗ View in CleverTap</a>` : ''}`;
+      }
+      return `<div class="action-result error">❌ Campaign failed to send.</div>`;
+    }
+
+    return `<pre style="font-size:11px;color:var(--text-muted);overflow:auto">${JSON.stringify(result, null, 2)}</pre>`;
+  }
+
+  // ============================================================
+  // MAIN SEND FUNCTION
+  // ============================================================
+  async function sendMessage(text) {
+    const input = document.getElementById('input');
+    const userText = text || input.value.trim();
+    if (!userText || isLoading) return;
+
+    // Hide welcome
+    const welcome = document.getElementById('welcome');
+    if (welcome) welcome.remove();
+
+    // Clear input
+    input.value = '';
+    input.style.height = 'auto';
+
+    // Add user message
+    addMessage('user', userText);
+    conversationHistory.push({ role: 'user', content: userText });
+
+    // Show typing
+    setLoading(true);
+    const typingEl = addTyping();
+
+    try {
+      let messages = [...conversationHistory];
+      let finalResponse = '';
+      let toolCallsHtml = '';
+      let continueLoop = true;
+
+      while (continueLoop) {
+        const response = await fetch(CLAUDE_PROXY, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-bot-secret': BOT_SECRET
+          },
+          body: JSON.stringify({
+            messages: messages,
+            tools: TOOLS,
+            system: SYSTEM_PROMPT,
+            max_tokens: 2048
+          })
+        });
+
+        if (!response.ok) throw new Error(`API error: ${response.status}`);
+        const data = await response.json();
+        const content = data.content || [];
+
+        // Process response
+        let hasToolUse = false;
+        const toolResults = [];
+
+        for (const block of content) {
+          if (block.type === 'text') {
+            finalResponse += block.text;
+          }
+          if (block.type === 'tool_use') {
+            hasToolUse = true;
+
+            // Show tool call indicator
+            toolCallsHtml += `
+              <div class="tool-call">
+                <div class="tool-call-icon">⚙</div>
+                <span>Calling ${block.name.replace(/_/g, ' ')}...</span>
+              </div>`;
+
+            // Execute tool
+            const result = await executeTool(block.name, block.input);
+
+            // Render rich result
+            toolCallsHtml += renderToolResult(block.name, block.input, result);
+
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: JSON.stringify(result)
+            });
+          }
+        }
+
+        if (hasToolUse) {
+          // Add assistant message with tool use to history
+          messages.push({ role: 'assistant', content: content });
+          // Add tool results
+          messages.push({ role: 'user', content: toolResults });
+          // Continue loop if Claude wants to process results
+          continueLoop = data.stop_reason === 'tool_use';
+        } else {
+          continueLoop = false;
+        }
+      }
+
+      // Remove typing
+      typingEl.remove();
+
+      // Build final HTML
+      let html = '';
+      if (toolCallsHtml) html += toolCallsHtml;
+      if (finalResponse) html += formatText(finalResponse);
+
+      addMessage('agent', html, true);
+
+      // Update history
+      conversationHistory.push({ role: 'assistant', content: finalResponse || 'Done.' });
+
+    } catch (err) {
+      typingEl.remove();
+      addMessage('agent', `<div class="action-result error">❌ Error: ${err.message}</div>`, true);
+    }
+
+    setLoading(false);
+  }
+
+  // ============================================================
+  // TEXT FORMATTING
+  // ============================================================
+  function formatText(text) {
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code style="background:var(--surface-2);padding:2px 6px;border-radius:4px;font-family:DM Mono,monospace;font-size:12px">$1</code>')
+      .replace(/\n/g, '<br>');
+  }
+
+  // ============================================================
+  // UI HELPERS
+  // ============================================================
+  function addMessage(role, content, isHtml = false) {
+    const messages = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+
+    const avatarText = role === 'user' ? 'RS' : 'CK';
+    const bubbleContent = isHtml ? content : `<p>${escapeHtml(content)}</p>`;
+
+    div.innerHTML = `
+      <div class="avatar">${avatarText}</div>
+      <div class="bubble">${bubbleContent}</div>
+    `;
+
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    return div;
+  }
+
+  function addTyping() {
+    const messages = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'typing';
+    div.innerHTML = `
+      <div class="avatar" style="background:linear-gradient(135deg,var(--orange),var(--orange-dark));color:white;box-shadow:0 4px 12px rgba(255,107,53,0.25)">CK</div>
+      <div class="typing-bubble">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    `;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    return div;
+  }
+
+  function setLoading(val) {
+    isLoading = val;
+    document.getElementById('sendBtn').disabled = val;
+  }
+
+  function escapeHtml(text) {
+    return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function sendSuggestion(text) {
+    sendMessage(text);
+  }
+
+  function clearChat() {
+    conversationHistory = [];
+    const messages = document.getElementById('messages');
+    messages.innerHTML = `
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">⚡</div>
+        <h2>Hey Rohit, what are we <span>launching</span> today?</h2>
+        <p>Ask me about campaign stats, approve or cancel campaigns, check reach numbers, or fire a campaign right now.</p>
+        <div class="welcome-examples">
+          <div class="example-card" onclick="sendSuggestion('Stats today')">
+            <div class="ex-icon">📊</div>
+            <div class="ex-title">Check Stats</div>
+            <div class="ex-desc">Today's campaigns, reach numbers, success rate</div>
+          </div>
+          <div class="example-card" onclick="sendSuggestion('Show pending approval campaigns')">
+            <div class="ex-icon">✅</div>
+            <div class="ex-title">Approve Campaigns</div>
+            <div class="ex-desc">Review and approve pending campaigns</div>
+          </div>
+          <div class="example-card" onclick="sendSuggestion('Show sent campaigns today')">
+            <div class="ex-icon">🚀</div>
+            <div class="ex-title">Campaign History</div>
+            <div class="ex-desc">View sent campaigns and performance</div>
+          </div>
+          <div class="example-card" onclick="sendSuggestion('Show campaigns for brand Myntra')">
+            <div class="ex-icon">🎯</div>
+            <div class="ex-title">Filter by Brand</div>
+            <div class="ex-desc">Find campaigns for specific retailers</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function handleKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+</script>
+</body>
+</html>
