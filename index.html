@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0A0E1A">
 <title>CK Campaign Agent</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -33,9 +37,11 @@
     background: var(--bg);
     color: var(--text);
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    overscroll-behavior: none;
   }
 
   /* Background grid */
@@ -521,12 +527,13 @@
     border: none;
     outline: none;
     color: var(--text);
-    font-size: 14px;
+    font-size: 16px; /* 16px prevents iOS auto-zoom on focus */
     font-family: 'DM Sans', sans-serif;
     resize: none;
     max-height: 120px;
     min-height: 24px;
     line-height: 1.6;
+    -webkit-appearance: none;
   }
 
   textarea::placeholder { color: var(--text-dim); }
@@ -563,13 +570,61 @@
   /* Scrollbar */
   .messages::-webkit-scrollbar { width: 3px; }
 
-  /* Responsive */
-  @media (max-width: 640px) {
+  /* Responsive — Mobile First */
+  @media (max-width: 768px) {
+    .welcome-examples { grid-template-columns: 1fr 1fr; }
+    header { padding: 10px 16px; height: 52px; }
+    .logo-title { font-size: 14px; }
+    .logo-sub { display: none; }
+    .status-text { display: none; }
+    .messages { padding: 12px 14px; gap: 14px; }
+    .input-area { padding: 10px 14px 12px; }
+    .suggestions { padding: 8px 14px; gap: 6px; }
+    .suggestion-chip { font-size: 11px; padding: 5px 11px; }
+    .bubble { font-size: 13px; max-width: calc(100vw - 80px); }
+    .welcome h2 { font-size: 20px; }
+    .welcome p { font-size: 13px; }
+    .welcome-icon { width: 56px; height: 56px; font-size: 24px; }
+    .example-card { padding: 12px; }
+    .ex-title { font-size: 12px; }
+    .ex-desc { font-size: 10px; }
+  }
+
+  @media (max-width: 480px) {
     .welcome-examples { grid-template-columns: 1fr; }
-    header { padding: 12px 16px; }
-    .messages { padding: 16px; }
-    .input-area { padding: 12px 16px 16px; }
-    .suggestions { padding: 8px 16px; }
+    .header-right { gap: 8px; }
+  }
+
+  /* CRITICAL: Fix input area staying visible when mobile keyboard opens */
+  /* Use dvh (dynamic viewport height) so keyboard doesn't hide input */
+  @supports (height: 100dvh) {
+    body { height: 100dvh; }
+    .app-wrapper { height: 100dvh; }
+  }
+
+  /* Prevent iOS Safari bounce scroll hiding input */
+  body { overscroll-behavior: none; }
+  .messages { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+
+  /* Make input area always stick to bottom above keyboard */
+  .input-area {
+    position: sticky;
+    bottom: 0;
+    background: rgba(10, 14, 26, 0.98);
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+
+  /* Suggestions sticky below header */
+  .suggestions {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  /* Login gate mobile fix */
+  @media (max-width: 480px) {
+    .login-box { padding: 32px 24px; }
+    .login-title { font-size: 20px; }
   }
 
   /* LOGIN GATE */
@@ -611,10 +666,10 @@
   .login-input {
     width: 100%; background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
-    padding: 14px 16px; color: white; font-size: 15px;
+    padding: 14px 16px; color: white; font-size: 16px;
     font-family: 'DM Sans', sans-serif; outline: none;
     transition: border-color 0.2s; text-align: center;
-    letter-spacing: 3px;
+    letter-spacing: 3px; -webkit-appearance: none;
   }
 
   .login-input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(255,107,53,0.15); }
@@ -640,7 +695,7 @@
 
   .login-footer { margin-top: 20px; font-size: 11px; color: rgba(255,255,255,0.2); font-family: 'DM Mono', monospace; }
 
-  .app-wrapper { display: none; flex-direction: column; height: 100vh; }
+  .app-wrapper { display: none; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
   .app-wrapper.visible { display: flex; }
 </style>
 </head>
