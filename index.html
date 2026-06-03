@@ -571,9 +571,103 @@
     .input-area { padding: 12px 16px 16px; }
     .suggestions { padding: 8px 16px; }
   }
+
+  /* LOGIN GATE */
+  .login-gate {
+    position: fixed; inset: 0; z-index: 999;
+    background: linear-gradient(135deg, #0A0E1A 0%, #1B3A6B 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+
+  .login-gate::before {
+    content: ''; position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(255,107,53,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,107,53,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none;
+  }
+
+  .login-box {
+    background: #111827; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px; padding: 40px 36px; width: 100%; max-width: 400px;
+    text-align: center; position: relative; z-index: 1;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  }
+
+  .login-icon {
+    width: 64px; height: 64px;
+    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+    border-radius: 18px; display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; color: white;
+    margin: 0 auto 20px; box-shadow: 0 8px 24px rgba(255,107,53,0.3);
+  }
+
+  .login-title {
+    font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800;
+    color: white; margin-bottom: 6px;
+  }
+
+  .login-sub { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 28px; }
+
+  .login-input {
+    width: 100%; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+    padding: 14px 16px; color: white; font-size: 15px;
+    font-family: 'DM Sans', sans-serif; outline: none;
+    transition: border-color 0.2s; text-align: center;
+    letter-spacing: 3px;
+  }
+
+  .login-input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(255,107,53,0.15); }
+  .login-input::placeholder { letter-spacing: 0; color: rgba(255,255,255,0.25); }
+
+  .login-btn {
+    width: 100%; margin-top: 14px;
+    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+    border: none; border-radius: 12px; padding: 14px;
+    color: white; font-size: 15px; font-weight: 600;
+    font-family: 'Syne', sans-serif; cursor: pointer;
+    transition: all 0.2s; box-shadow: 0 4px 16px rgba(255,107,53,0.3);
+  }
+
+  .login-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,107,53,0.4); }
+  .login-btn:active { transform: scale(0.98); }
+
+  .login-error {
+    margin-top: 12px; padding: 10px; border-radius: 8px;
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);
+    color: #FCA5A5; font-size: 13px; display: none;
+  }
+
+  .login-footer { margin-top: 20px; font-size: 11px; color: rgba(255,255,255,0.2); font-family: 'DM Mono', monospace; }
+
+  .app-wrapper { display: none; flex-direction: column; height: 100vh; }
+  .app-wrapper.visible { display: flex; }
 </style>
 </head>
 <body>
+
+<!-- LOGIN GATE -->
+<div class="login-gate" id="loginGate">
+  <div class="login-box">
+    <div class="login-icon">CK</div>
+    <div class="login-title">Campaign Agent</div>
+    <div class="login-sub">CashKaro · Restricted Access</div>
+    <input
+      type="password"
+      class="login-input"
+      id="passwordInput"
+      placeholder="Enter access password"
+      onkeydown="if(event.key==='Enter') checkPassword()"
+      autofocus
+    />
+    <button class="login-btn" onclick="checkPassword()">Access Campaign Agent →</button>
+    <div class="login-error" id="loginError">❌ Incorrect password. Try again.</div>
+    <div class="login-footer">Only @cashkaro.com team members</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app-wrapper" id="appWrapper">
 
 <header>
   <div class="logo">
@@ -1167,13 +1261,6 @@ ${dynamicKnowledgeBase}`;
   }
 
   // ============================================================
-  // INIT — load KB on page start
-  // ============================================================
-  window.addEventListener('load', () => {
-    loadKnowledgeBase();
-  });
-
-  // ============================================================
   // MAIN SEND FUNCTION
   // ============================================================
   async function sendMessage(text) {
@@ -1404,6 +1491,65 @@ ${dynamicKnowledgeBase}`;
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }
+
+  // ============================================================
+  // PASSWORD PROTECTION
+  // Password: ckagent2026
+  // Stored as SHA-256 hash — never plain text in source
+  // ============================================================
+  const PASSWORD_HASH = '70676564fa31883187967aae06a7309530b18a0eeebe5c1ccebb37b97e5bd0c0';
+
+  async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + 'ck_salt_2026');
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function checkPassword() {
+    const input = document.getElementById('passwordInput').value;
+    const errorEl = document.getElementById('loginError');
+    const btn = document.querySelector('.login-btn');
+
+    if (!input) return;
+
+    btn.textContent = 'Verifying...';
+    btn.disabled = true;
+
+    const hash = await hashPassword(input);
+
+    if (hash === PASSWORD_HASH) {
+      // Correct — store session and show app
+      sessionStorage.setItem('ck_auth', '1');
+      document.getElementById('loginGate').style.display = 'none';
+      document.getElementById('appWrapper').classList.add('visible');
+      loadKnowledgeBase();
+    } else {
+      errorEl.style.display = 'block';
+      document.getElementById('passwordInput').value = '';
+      document.getElementById('passwordInput').focus();
+      btn.textContent = 'Access Campaign Agent →';
+      btn.disabled = false;
+      // Shake animation
+      document.querySelector('.login-box').style.animation = 'shake 0.4s ease';
+      setTimeout(() => document.querySelector('.login-box').style.animation = '', 400);
+    }
+  }
+
+  // Check if already authenticated this session
+  window.addEventListener('load', () => {
+    if (sessionStorage.getItem('ck_auth') === '1') {
+      document.getElementById('loginGate').style.display = 'none';
+      document.getElementById('appWrapper').classList.add('visible');
+      loadKnowledgeBase();
+    }
+    // Add shake keyframe dynamically
+    const style = document.createElement('style');
+    style.textContent = '@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}';
+    document.head.appendChild(style);
+  });
 </script>
+</div>
 </body>
 </html>
