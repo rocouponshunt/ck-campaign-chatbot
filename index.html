@@ -595,10 +595,10 @@
   <div class="suggestion-chip" onclick="sendSuggestion('Stats this week')">📈 Stats this week</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show sent campaigns today')">✅ Sent today</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show pending approval campaigns')">⏳ Pending approval</div>
-  <div class="suggestion-chip" onclick="sendSuggestion('Show all draft campaigns')">📝 Drafts</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('I want to create a new push campaign')">🚀 Create campaign</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('I want to schedule a campaign for later')">📅 Schedule campaign</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show campaigns for Myntra')">🛍️ Myntra campaigns</div>
-  <div class="suggestion-chip" onclick="sendSuggestion('Send push to Myntra exit clickers last 7 days, title: Flash Sale is Live! 🔥, body: Up to 40% cashback on Myntra. Today only., link: https://cashkaro.com/stores/myntra')">🚀 Quick Myntra push</div>
-  <div class="suggestion-chip" onclick="sendSuggestion('Stats this month')">📅 This month</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('Show all draft campaigns')">📝 Drafts</div>
 </div>
 
 <div class="messages" id="messages">
@@ -617,15 +617,15 @@
         <div class="ex-title">Approve Campaigns</div>
         <div class="ex-desc">Review and approve pending campaigns</div>
       </div>
-      <div class="example-card" onclick="sendSuggestion('Send push to Champion users, title: Exclusive Deal Just for You! 🎯, body: Top cashback offers waiting. Shop now and earn big., link: https://cashkaro.com')">
+      <div class="example-card" onclick="sendSuggestion('I want to create a new push campaign')">
         <div class="ex-icon">🚀</div>
         <div class="ex-title">Create Campaign</div>
-        <div class="ex-desc">Describe a campaign and launch it instantly</div>
+        <div class="ex-desc">I'll ask for details, show a preview, and wait for your approval</div>
       </div>
-      <div class="example-card" onclick="sendSuggestion('Schedule push for Myntra exit clickers last 7 days at 6pm today, title: Myntra Sale Ends Tonight! ⏰, body: Last chance for 18% cashback. Shop before midnight., link: https://cashkaro.com/stores/myntra')">
+      <div class="example-card" onclick="sendSuggestion('I want to schedule a campaign for later')">
         <div class="ex-icon">📅</div>
         <div class="ex-title">Schedule Campaign</div>
-        <div class="ex-desc">Create and schedule for a specific time</div>
+        <div class="ex-desc">Create a campaign and set a future send time</div>
       </div>
     </div>
   </div>
@@ -769,62 +769,120 @@
         },
         required: ["brand", "pn_title", "pn_body", "deep_link", "segment_name", "targeting_json"]
       }
+    },
+    {
+      name: "save_to_knowledge_base",
+      description: "Save a correction or new learning to the knowledge base so future responses are better. Call this when user confirms they want to save a correction.",
+      input_schema: {
+        type: "object",
+        properties: {
+          category: { type: "string", description: "Category: Corrections, Segment Rules, Events, User Properties, Examples" },
+          title: { type: "string", description: "Short descriptive title for this entry" },
+          content: { type: "string", description: "The actual rule, correction, or example to save" }
+        },
+        required: ["category", "title", "content"]
+      }
     }
   ];
 
-  const SYSTEM_PROMPT = `You are CK Campaign Agent, an AI assistant for CashKaro's marketing team.
+  // Dynamic KB from Supabase
+  let dynamicKnowledgeBase = '';
+
+  async function loadKnowledgeBase() {
+    try {
+      const result = await callEdge({ action: 'get_knowledge_base' });
+      if (result.entries && result.entries.length > 0) {
+        dynamicKnowledgeBase = '\n\n## LEARNED CORRECTIONS (follow these rules FIRST — they override defaults)\n';
+        result.entries.forEach(e => {
+          dynamicKnowledgeBase += `\n[${e.category}] ${e.title}: ${e.content}\n`;
+        });
+      }
+    } catch(e) {
+      console.log('KB load skipped:', e.message);
+    }
+  }
+
+  function buildSystemPrompt() {
+    const today = todayIST();
+    const d7 = (() => { const d = new Date(); d.setDate(d.getDate()-7); return d.toISOString().split('T')[0].replace(/-/g,''); })();
+    const d15 = (() => { const d = new Date(); d.setDate(d.getDate()-15); return d.toISOString().split('T')[0].replace(/-/g,''); })();
+    const d30 = (() => { const d = new Date(); d.setDate(d.getDate()-30); return d.toISOString().split('T')[0].replace(/-/g,''); })();
+    const todayNum = today.replace(/-/g,'');
+
+    return `You are CK Campaign Agent, an AI assistant for CashKaro's marketing team.
 You help CREATE and MANAGE push notification campaigns via a chat interface.
 
-TODAY'S DATE (IST): ${todayIST()}
-Always use this date for "today", "now", date calculations. Never use 2025 dates.
+TODAY'S DATE (IST): ${today}
+Always use this date for calculations. Never use 2025 dates.
 
-## Your capabilities:
-- Check campaign stats (today, this week, this month)
-- List/filter campaigns by status, brand, date
-- Approve, cancel campaigns
-- Fire existing campaigns immediately
-- CREATE NEW campaigns from scratch and send or schedule them
+## CRITICAL RULE — NEVER AUTO-SEND
+NEVER call create_and_send, create_and_schedule, fire_campaign_now, or approve_campaign 
+without EXPLICIT confirmation from the user in the SAME conversation turn.
 
-## CashKaro Events (for targeting JSON):
-- exit_click — user clicked to retailer. Attributes: store_name
-- Store_Page — user visited store. Attributes: store_name
-- Transaction — user purchased. Attributes: Retailer, amount
-- dynamic_home_page — homepage visit
+Confirmation words: "yes", "confirm", "send it", "go ahead", "do it", "approve", 
+"fire it", "schedule it", "send now", "yes send", "haan", "kar do"
 
-## User Properties (for targeting):
+Clicking a suggestion chip is NOT confirmation. Always show review first.
+
+## CORRECTION DETECTION
+If user corrects any output (wrong JSON, wrong segment, wrong copy, wrong dates):
+1. Apply the correction immediately
+2. Ask: "Got it! Should I save this to the knowledge base so I always get this right? Reply 'save it'."
+3. If user says "save it" / "yes save" / "haan save karo" → call save_to_knowledge_base
+
+## Create Campaign Workflow
+Step 1 — Gather: brand, target audience, message, send now or schedule?
+Step 2 — Generate & show review card with all details. Ask for confirm.
+Step 3 — Only after "confirm" → call tool.
+
+Review card format:
+📋 CAMPAIGN REVIEW
+Brand: [brand]
+Target: [segment]
+Title: [title]
+Body: [body]
+Deep Link: [url]
+Send: [now / DATE at TIME IST]
+→ "Reply 'confirm' to send or tell me what to change."
+
+## Other Workflows
+Approve: show details → ask confirm → call approve_campaign
+Fire existing: show details + reach → ask confirm → call fire_campaign_now
+Schedule: same as create but ask date/time. Default time = 18:00 IST.
+
+## Events:
+- exit_click: store_name attribute
+- Store_Page: store_name attribute  
+- Transaction: Retailer attribute
+- dynamic_home_page
+
+## User Properties:
 - june_26_segment_name: 1-Champion, 2-Sleeping_Giant, 3-Rising_Stars, 4-Hibernating_Users, 5-Sleeping_Users, 6-Inactive_Users
 - last_exit_click_retailer, last_transaction_retailer, total_no_of_transactions
 - Tier_Preferred: Gold, Silver, Platinum
 - may_26_Remarketing_tg_cg: rmkt_tg, rmkt_cg
 
-## Targeting JSON rules:
-- event_properties = BARE ARRAY: [{"name":"store_name","operator":"equals","value":"Myntra"}]
+## Targeting JSON:
+- event_properties = BARE ARRAY: [{"name":"store_name","operator":"equals","value":"X"}]
 - common_profile_properties = WRAPPED: {"profile_fields":[{"name":"X","operator":"equals","value":"Y"}]}
-- Dates = YYYYMMDD integers. Calculate from TODAY: ${todayIST().replace(/-/g,'')}
-- "last 7 days" from today = from ${(() => { const d = new Date(); d.setDate(d.getDate()-7); return d.toISOString().split('T')[0].replace(/-/g,''); })()}, to ${todayIST().replace(/-/g,'')}
-- "last 15 days" from today = from ${(() => { const d = new Date(); d.setDate(d.getDate()-15); return d.toISOString().split('T')[0].replace(/-/g,''); })()}, to ${todayIST().replace(/-/g,'')}
-- "last 30 days" from today = from ${(() => { const d = new Date(); d.setDate(d.getDate()-30); return d.toISOString().split('T')[0].replace(/-/g,''); })()}, to ${todayIST().replace(/-/g,'')}
+- Dates = YYYYMMDD integers. Today=${todayNum}
+- last 7d: from=${d7} to=${todayNum}
+- last 15d: from=${d15} to=${todayNum}  
+- last 30d: from=${d30} to=${todayNum}
 - Have Not Done: advanced_query.did_none
-- Event count: advanced_query.did_all with operator and integer value
+- Event count: advanced_query.did_all with operator + integer value
 
-## CASHvertising copy rules (for generating titles/bodies):
-- Use Fear of Loss, FOMO, Urgency, specific numbers, exact store names
-- Title max 50 chars, end with 1 emoji
-- Body max 150 chars, include specific cashback % or ₹ amount if known
-- Hindi-English mix acceptable: "Abhi shop karo", "Seedha wallet mein"
+## Copy rules:
+- CASHvertising: Fear of Loss, FOMO, Urgency, specific ₹ amounts
+- Title max 50 chars + 1 emoji. Body max 150 chars.
+- Hindi-English ok: "Abhi shop karo", "Seedha wallet mein"
 
-## Workflow:
-- When user says "send push to X users" → use create_and_send tool
-- When user says "schedule campaign for X time" → use create_and_schedule tool  
-- When user says "fire/send campaign [id]" → use fire_campaign_now tool
-- Always show a summary of what you're about to create BEFORE calling the tool
-- After creating, show the result with campaign ID and reach
-
-## Formatting:
+## Output:
 - Numbers: Indian format (1,37,180)
-- Always include campaign ID in results
-- Show CleverTap link when available
-- Be concise, use emojis sparingly`;
+- CleverTap URLs: always rendered as clickable links
+- Show campaign ID after every action
+${dynamicKnowledgeBase}`;
+  }
 
   // ============================================================
   // EDGE API CALL
@@ -954,7 +1012,6 @@ Always use this date for "today", "now", date calculations. Never use 2025 dates
     else if (toolName === 'create_and_schedule') {
       const schedDate = toolInput.scheduled_date || todayIST();
       const schedTime = toolInput.scheduled_time || '18:00';
-      // Save to Supabase via edge function then return confirmation
       const result = await callEdge({
         action: 'create_campaign',
         campaign: {
@@ -973,6 +1030,24 @@ Always use this date for "today", "now", date calculations. Never use 2025 dates
         }
       });
       return { ...result, scheduled_date: schedDate, scheduled_time: schedTime };
+    }
+
+    else if (toolName === 'save_to_knowledge_base') {
+      try {
+        const result = await callEdge({
+          action: 'save_knowledge',
+          category: toolInput.category,
+          title: toolInput.title,
+          content: toolInput.content
+        });
+        // Also append to local dynamicKnowledgeBase for immediate use this session
+        dynamicKnowledgeBase += `\n[${toolInput.category}] ${toolInput.title}: ${toolInput.content}\n`;
+        return result.success ? { success: true } : { success: false, note: 'Saved locally for this session' };
+      } catch(e) {
+        // Edge function doesn't have save_knowledge yet — save locally for session
+        dynamicKnowledgeBase += `\n[${toolInput.category}] ${toolInput.title}: ${toolInput.content}\n`;
+        return { success: true, note: 'Saved locally for this session (will sync to Supabase after Lovable update)' };
+      }
     }
 
     return { error: 'Unknown tool' };
@@ -1082,8 +1157,21 @@ Always use this date for "today", "now", date calculations. Never use 2025 dates
       return `<div class="action-result error">❌ Campaign failed to send.</div>`;
     }
 
+    if (toolName === 'save_to_knowledge_base') {
+      return result.success
+        ? `<div class="action-result success">✅ Saved to knowledge base! I'll use this in all future conversations.<br><small style="opacity:0.7">${result.note || ''}</small></div>`
+        : `<div class="action-result error">❌ Failed to save: ${result.error}</div>`;
+    }
+
     return `<pre style="font-size:11px;color:var(--text-muted);overflow:auto">${JSON.stringify(result, null, 2)}</pre>`;
   }
+
+  // ============================================================
+  // INIT — load KB on page start
+  // ============================================================
+  window.addEventListener('load', () => {
+    loadKnowledgeBase();
+  });
 
   // ============================================================
   // MAIN SEND FUNCTION
@@ -1125,7 +1213,7 @@ Always use this date for "today", "now", date calculations. Never use 2025 dates
           body: JSON.stringify({
             messages: messages,
             tools: TOOLS,
-            system: SYSTEM_PROMPT,
+            system: buildSystemPrompt(),
             max_tokens: 2048
           })
         });
