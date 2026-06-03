@@ -597,6 +597,7 @@
   <div class="suggestion-chip" onclick="sendSuggestion('Show pending approval campaigns')">⏳ Pending approval</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show all draft campaigns')">📝 Drafts</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show campaigns for Myntra')">🛍️ Myntra campaigns</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('Send push to Myntra exit clickers last 7 days, title: Flash Sale is Live! 🔥, body: Up to 40% cashback on Myntra. Today only., link: https://cashkaro.com/stores/myntra')">🚀 Quick Myntra push</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Stats this month')">📅 This month</div>
 </div>
 
@@ -616,15 +617,15 @@
         <div class="ex-title">Approve Campaigns</div>
         <div class="ex-desc">Review and approve pending campaigns</div>
       </div>
-      <div class="example-card" onclick="sendSuggestion('Show sent campaigns today')">
+      <div class="example-card" onclick="sendSuggestion('Send push to Champion users, title: Exclusive Deal Just for You! 🎯, body: Top cashback offers waiting. Shop now and earn big., link: https://cashkaro.com')">
         <div class="ex-icon">🚀</div>
-        <div class="ex-title">Campaign History</div>
-        <div class="ex-desc">View sent campaigns and performance</div>
+        <div class="ex-title">Create Campaign</div>
+        <div class="ex-desc">Describe a campaign and launch it instantly</div>
       </div>
-      <div class="example-card" onclick="sendSuggestion('Show campaigns for brand Myntra')">
-        <div class="ex-icon">🎯</div>
-        <div class="ex-title">Filter by Brand</div>
-        <div class="ex-desc">Find campaigns for specific retailers</div>
+      <div class="example-card" onclick="sendSuggestion('Schedule push for Myntra exit clickers last 7 days at 6pm today, title: Myntra Sale Ends Tonight! ⏰, body: Last chance for 18% cashback. Shop before midnight., link: https://cashkaro.com/stores/myntra')">
+        <div class="ex-icon">📅</div>
+        <div class="ex-title">Schedule Campaign</div>
+        <div class="ex-desc">Create and schedule for a specific time</div>
       </div>
     </div>
   </div>
@@ -634,7 +635,7 @@
   <div class="input-wrapper">
     <textarea
       id="input"
-      placeholder="Ask anything... 'stats this week', 'approve campaign abc123', 'show Myntra campaigns'"
+      placeholder="Create or manage campaigns... 'send push to Myntra exit clickers last 7 days', 'stats this week', 'approve campaign xyz'"
       rows="1"
       onkeydown="handleKeydown(event)"
       oninput="autoResize(this)"
@@ -663,6 +664,18 @@
   // ============================================================
   // TOOLS
   // ============================================================
+  // Today's date helpers
+  function todayIST() {
+    const now = new Date();
+    const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    return ist.toISOString().split('T')[0];
+  }
+
+  function todayFormatted() {
+    const d = new Date(todayIST());
+    return d.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
   const TOOLS = [
     {
       name: "get_campaigns",
@@ -712,7 +725,7 @@
     },
     {
       name: "fire_campaign_now",
-      description: "Send a campaign immediately to CleverTap right now.",
+      description: "Send an EXISTING campaign (by ID) immediately to CleverTap right now.",
       input_schema: {
         type: "object",
         properties: {
@@ -720,24 +733,98 @@
         },
         required: ["campaign_id"]
       }
+    },
+    {
+      name: "create_and_send",
+      description: "Create a NEW campaign from scratch and send it immediately to CleverTap. Use this when user describes a new campaign to launch. Generates segment JSON automatically from the description.",
+      input_schema: {
+        type: "object",
+        properties: {
+          brand: { type: "string", description: "Brand/retailer name e.g. Myntra, Amazon, Ajio" },
+          channel: { type: "string", description: "push, email, sms, whatsapp — default push" },
+          pn_title: { type: "string", description: "Push notification title max 50 chars" },
+          pn_body: { type: "string", description: "Push notification body max 150 chars" },
+          deep_link: { type: "string", description: "Deep link URL e.g. https://cashkaro.com/stores/myntra" },
+          segment_name: { type: "string", description: "Plain English segment description" },
+          targeting_json: { type: "object", description: "CleverTap where JSON for targeting" }
+        },
+        required: ["brand", "pn_title", "pn_body", "deep_link", "segment_name", "targeting_json"]
+      }
+    },
+    {
+      name: "create_and_schedule",
+      description: "Create a NEW campaign from scratch and schedule it for a future time. Use when user wants to create and schedule for later.",
+      input_schema: {
+        type: "object",
+        properties: {
+          brand: { type: "string", description: "Brand/retailer name" },
+          channel: { type: "string", description: "push, email, sms, whatsapp — default push" },
+          pn_title: { type: "string", description: "Push notification title max 50 chars" },
+          pn_body: { type: "string", description: "Push notification body max 150 chars" },
+          deep_link: { type: "string", description: "Deep link URL" },
+          segment_name: { type: "string", description: "Plain English segment description" },
+          targeting_json: { type: "object", description: "CleverTap where JSON for targeting" },
+          scheduled_date: { type: "string", description: "Date YYYY-MM-DD, default today" },
+          scheduled_time: { type: "string", description: "Time HH:MM IST, default 18:00" }
+        },
+        required: ["brand", "pn_title", "pn_body", "deep_link", "segment_name", "targeting_json"]
+      }
     }
   ];
 
   const SYSTEM_PROMPT = `You are CK Campaign Agent, an AI assistant for CashKaro's marketing team.
-You help manage push notification campaigns via a chat interface.
+You help CREATE and MANAGE push notification campaigns via a chat interface.
 
-Your capabilities:
+TODAY'S DATE (IST): ${todayIST()}
+Always use this date for "today", "now", date calculations. Never use 2025 dates.
+
+## Your capabilities:
 - Check campaign stats (today, this week, this month)
-- List campaigns filtered by status, brand, date
-- Approve pending campaigns
-- Cancel campaigns
-- Fire campaigns immediately
+- List/filter campaigns by status, brand, date
+- Approve, cancel campaigns
+- Fire existing campaigns immediately
+- CREATE NEW campaigns from scratch and send or schedule them
 
-When showing campaign lists, include: brand, title, status, date/time, reach if available, and the campaign ID.
-When showing stats, format numbers clearly with Indian number format (1,37,180).
-Always confirm before firing campaigns — ask "Are you sure you want to fire campaign [title] to [reach] users?"
-Be concise and helpful. Use emojis sparingly for clarity.
-When a user asks to approve/cancel/fire by name instead of ID, first call get_campaigns to find the ID.`;
+## CashKaro Events (for targeting JSON):
+- exit_click — user clicked to retailer. Attributes: store_name
+- Store_Page — user visited store. Attributes: store_name
+- Transaction — user purchased. Attributes: Retailer, amount
+- dynamic_home_page — homepage visit
+
+## User Properties (for targeting):
+- june_26_segment_name: 1-Champion, 2-Sleeping_Giant, 3-Rising_Stars, 4-Hibernating_Users, 5-Sleeping_Users, 6-Inactive_Users
+- last_exit_click_retailer, last_transaction_retailer, total_no_of_transactions
+- Tier_Preferred: Gold, Silver, Platinum
+- may_26_Remarketing_tg_cg: rmkt_tg, rmkt_cg
+
+## Targeting JSON rules:
+- event_properties = BARE ARRAY: [{"name":"store_name","operator":"equals","value":"Myntra"}]
+- common_profile_properties = WRAPPED: {"profile_fields":[{"name":"X","operator":"equals","value":"Y"}]}
+- Dates = YYYYMMDD integers. Calculate from TODAY: ${todayIST().replace(/-/g,'')}
+- "last 7 days" from today = from ${(() => { const d = new Date(); d.setDate(d.getDate()-7); return d.toISOString().split('T')[0].replace(/-/g,''); })()}, to ${todayIST().replace(/-/g,'')}
+- "last 15 days" from today = from ${(() => { const d = new Date(); d.setDate(d.getDate()-15); return d.toISOString().split('T')[0].replace(/-/g,''); })()}, to ${todayIST().replace(/-/g,'')}
+- "last 30 days" from today = from ${(() => { const d = new Date(); d.setDate(d.getDate()-30); return d.toISOString().split('T')[0].replace(/-/g,''); })()}, to ${todayIST().replace(/-/g,'')}
+- Have Not Done: advanced_query.did_none
+- Event count: advanced_query.did_all with operator and integer value
+
+## CASHvertising copy rules (for generating titles/bodies):
+- Use Fear of Loss, FOMO, Urgency, specific numbers, exact store names
+- Title max 50 chars, end with 1 emoji
+- Body max 150 chars, include specific cashback % or ₹ amount if known
+- Hindi-English mix acceptable: "Abhi shop karo", "Seedha wallet mein"
+
+## Workflow:
+- When user says "send push to X users" → use create_and_send tool
+- When user says "schedule campaign for X time" → use create_and_schedule tool  
+- When user says "fire/send campaign [id]" → use fire_campaign_now tool
+- Always show a summary of what you're about to create BEFORE calling the tool
+- After creating, show the result with campaign ID and reach
+
+## Formatting:
+- Numbers: Indian format (1,37,180)
+- Always include campaign ID in results
+- Show CleverTap link when available
+- Be concise, use emojis sparingly`;
 
   // ============================================================
   // EDGE API CALL
@@ -813,6 +900,51 @@ When a user asks to approve/cancel/fire by name instead of ID, first call get_ca
       }
       return result;
     }
+    else if (toolName === 'create_and_send') {
+      const n8nWebhook = 'https://ckmarketingauto.app.n8n.cloud/webhook/launch-campaign-v2';
+      const resp = await fetch(n8nWebhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: toolInput.channel || 'push',
+          brand: toolInput.brand,
+          segment_name: toolInput.segment_name,
+          targeting_json: toolInput.targeting_json,
+          pn_title: toolInput.pn_title,
+          pn_body: toolInput.pn_body,
+          deep_link: toolInput.deep_link,
+          campaign_db_id: `agent_${Date.now()}`,
+          created_by: 'Campaign Agent'
+        })
+      });
+      const result = await resp.json();
+      return result;
+    }
+
+    else if (toolName === 'create_and_schedule') {
+      const schedDate = toolInput.scheduled_date || todayIST();
+      const schedTime = toolInput.scheduled_time || '18:00';
+      // Save to Supabase via edge function then return confirmation
+      const result = await callEdge({
+        action: 'create_campaign',
+        campaign: {
+          date: schedDate,
+          time: schedTime,
+          channel: toolInput.channel || 'push',
+          brand: toolInput.brand,
+          segment_name: toolInput.segment_name,
+          segment_json: toolInput.targeting_json,
+          pn_title: toolInput.pn_title,
+          pn_body: toolInput.pn_body,
+          deep_link: toolInput.deep_link,
+          status: 'Approved',
+          created_by_name: 'Campaign Agent',
+          notes: 'Created via Campaign Agent chatbot'
+        }
+      });
+      return { ...result, scheduled_date: schedDate, scheduled_time: schedTime };
+    }
+
     return { error: 'Unknown tool' };
   }
 
@@ -869,6 +1001,39 @@ When a user asks to approve/cancel/fire by name instead of ID, first call get_ca
       return result.success
         ? `<div class="action-result success">✅ Campaign cancelled and moved back to Draft.</div>`
         : `<div class="action-result error">❌ Failed to cancel: ${result.error || 'Unknown error'}</div>`;
+    }
+
+    if (toolName === 'create_and_send') {
+      if (result.status === 'success') {
+        const total = (result.android_reach || 0) + (result.ios_reach || 0);
+        return `
+          <div class="action-result success">🚀 Campaign created and fired successfully!</div>
+          <div class="stat-block">
+            <div class="stat-row"><span class="stat-label">Brand</span><span class="stat-value">${toolInput.brand}</span></div>
+            <div class="stat-row"><span class="stat-label">Title</span><span class="stat-value">${toolInput.pn_title}</span></div>
+            <div class="stat-row"><span class="stat-label">CT Campaign ID</span><span class="stat-value highlight">${result.campaign_id || result.id}</span></div>
+            <div class="stat-row"><span class="stat-label">Android Reach</span><span class="stat-value">${(result.android_reach||0).toLocaleString('en-IN')}</span></div>
+            <div class="stat-row"><span class="stat-label">iOS Reach</span><span class="stat-value">${(result.ios_reach||0).toLocaleString('en-IN')}</span></div>
+            <div class="stat-row"><span class="stat-label">Total Reach</span><span class="stat-value highlight">${total.toLocaleString('en-IN')}</span></div>
+          </div>
+          ${result.url ? `<a href="${result.url}" target="_blank" class="ct-link">↗ View in CleverTap</a>` : ''}`;
+      }
+      return `<div class="action-result error">❌ Campaign failed to send: ${result.error || JSON.stringify(result)}</div>`;
+    }
+
+    if (toolName === 'create_and_schedule') {
+      if (result.success || result.campaign_id) {
+        return `
+          <div class="action-result success">✅ Campaign created and scheduled!</div>
+          <div class="stat-block">
+            <div class="stat-row"><span class="stat-label">Brand</span><span class="stat-value">${toolInput.brand}</span></div>
+            <div class="stat-row"><span class="stat-label">Title</span><span class="stat-value">${toolInput.pn_title}</span></div>
+            <div class="stat-row"><span class="stat-label">Scheduled For</span><span class="stat-value highlight">${result.scheduled_date} at ${result.scheduled_time} IST</span></div>
+            <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value">Approved — will auto-send</span></div>
+            ${result.campaign_id ? `<div class="stat-row"><span class="stat-label">ID</span><span class="stat-value" style="font-family:'DM Mono',monospace;font-size:11px">${result.campaign_id}</span></div>` : ''}
+          </div>`;
+      }
+      return `<div class="action-result error">❌ Failed to schedule: ${result.error || 'Check if create_campaign action is supported by the edge function'}</div>`;
     }
 
     if (toolName === 'fire_campaign_now') {
