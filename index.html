@@ -823,6 +823,62 @@
 
   .app-wrapper { display: none; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
   .app-wrapper.visible { display: flex; }
+
+  /* LIGHT MODE */
+  body.light {
+    --orange: #E55A25;
+    --orange-dark: #C94D1A;
+    --orange-glow: rgba(229,90,37,0.1);
+    --bg: #F0F4FF;
+    --surface: #FFFFFF;
+    --surface-2: #F0F4FF;
+    --border: rgba(27,58,107,0.1);
+    --border-active: rgba(229,90,37,0.4);
+    --text: #1B3A6B;
+    --text-muted: #6B7280;
+    --text-dim: rgba(27,58,107,0.3);
+    --user-bubble: #1B3A6B;
+    --agent-bubble: #FFFFFF;
+  }
+  body.light { background: var(--bg); }
+  body.light nav { background: rgba(27,58,107,0.97); }
+  body.light .suggestions { background: rgba(240,244,255,0.95); }
+  body.light .input-area { background: rgba(240,244,255,0.98); }
+  body.light .input-wrapper { background: white; }
+  body.light .login-gate { background: linear-gradient(135deg, #EEF2F8 0%, #DBEAFE 100%); }
+  body.light .login-box { background: white; border-color: rgba(27,58,107,0.12); }
+  body.light .login-title { color: #1B3A6B; }
+  body.light .login-sub { color: #6B7280; }
+  body.light .login-input { background: #F8FAFC; border-color: rgba(27,58,107,0.15); color: #1B3A6B; }
+  body.light .login-footer { color: rgba(27,58,107,0.3); }
+  body.light .bubble { color: var(--text); }
+  body.light .message.user .bubble { background: #1B3A6B; color: white; }
+  body.light .message.agent .bubble { background: white; border-color: rgba(27,58,107,0.1); }
+  body.light .progress-container { background: white; border-color: rgba(27,58,107,0.1); }
+  body.light .progress-step.pending .progress-step-icon { background: #F0F4FF; border-color: rgba(27,58,107,0.15); }
+  body.light .stat-block { background: #F0F4FF; border-color: rgba(27,58,107,0.1); }
+  body.light textarea { color: #1B3A6B; }
+  body.light textarea::placeholder { color: rgba(27,58,107,0.3); }
+  body.light .welcome h2 { color: #1B3A6B; }
+  body.light .welcome p { color: #6B7280; }
+  body.light .example-card { background: white; border-color: rgba(27,58,107,0.1); }
+  body.light .suggestion-chip { background: white; border-color: rgba(27,58,107,0.1); color: #6B7280; }
+  body.light .suggestion-chip:hover { border-color: var(--orange); color: var(--orange); background: rgba(229,90,37,0.05); }
+
+  /* Theme toggle button */
+  .theme-toggle {
+    width: 36px; height: 36px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    transition: all 0.2s;
+    color: white;
+  }
+  .theme-toggle:hover { background: rgba(255,107,53,0.2); border-color: rgba(255,107,53,0.3); }
+  body.light .theme-toggle { background: rgba(27,58,107,0.08); border-color: rgba(27,58,107,0.15); color: #1B3A6B; }
 </style>
 </head>
 <body>
@@ -833,14 +889,18 @@
     <div class="login-icon">CK</div>
     <div class="login-title">Campaign Agent</div>
     <div class="login-sub">CashKaro · Restricted Access</div>
-    <input
-      type="password"
-      class="login-input"
-      id="passwordInput"
-      placeholder="Enter access password"
-      onkeydown="if(event.key==='Enter') checkPassword()"
-      autofocus
-    />
+    <div style="position:relative">
+      <input
+        type="password"
+        class="login-input"
+        id="passwordInput"
+        placeholder="Enter access password"
+        onkeydown="if(event.key==='Enter') checkPassword()"
+        autofocus
+        style="padding-right:48px"
+      />
+      <button onclick="togglePwVisibility()" id="pwToggle" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:rgba(255,255,255,0.4);padding:0;line-height:1" title="Show/hide password">👁</button>
+    </div>
     <button class="login-btn" onclick="checkPassword()">Access Campaign Agent →</button>
     <div class="login-error" id="loginError">❌ Incorrect password. Try again.</div>
     <div class="login-footer">Only @cashkaro.com team members</div>
@@ -861,6 +921,7 @@
   <div class="header-right">
     <div class="status-dot"></div>
     <span class="status-text">Connected</span>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark/light mode">🌙</button>
     <button class="clear-btn" onclick="clearChat()">Clear chat</button>
   </div>
 </header>
@@ -1590,65 +1651,160 @@ ${retailerCache}`;
   // Maps tool sequences to human-readable task flows
   const TASK_FLOWS = {
     create_campaign: {
-      title: 'Creating Campaign',
+      title: '🚀 Creating Campaign',
       steps: [
         { key: 'get_retailer', label: 'Fetching retailer info', sub: 'deep link & cashback rate' },
         { key: 'get_segment_performance', label: 'Checking best audiences', sub: 'historical CTR data' },
-        { key: 'thinking', label: 'Generating copy', sub: 'CASHvertising-optimised' },
-        { key: 'create_and_send', label: 'Firing campaign', sub: 'calling CleverTap API' },
-        { key: 'done', label: 'Campaign live!', sub: '' }
+        { key: 'create_and_send', label: 'Firing to CleverTap', sub: 'calling campaign API' },
+        { key: 'done', label: 'Campaign is live!', sub: '' }
       ]
     },
     schedule_campaign: {
-      title: 'Scheduling Campaign',
+      title: '📅 Scheduling Campaign',
       steps: [
         { key: 'get_retailer', label: 'Fetching retailer info', sub: 'deep link & cashback rate' },
         { key: 'get_segment_performance', label: 'Checking best audiences', sub: 'historical CTR data' },
-        { key: 'thinking', label: 'Generating copy', sub: 'CASHvertising-optimised' },
-        { key: 'create_and_schedule', label: 'Scheduling campaign', sub: 'saving to calendar' },
-        { key: 'done', label: 'Scheduled!', sub: '' }
+        { key: 'create_and_schedule', label: 'Saving to schedule', sub: 'will auto-fire at set time' },
+        { key: 'done', label: 'Scheduled successfully!', sub: '' }
       ]
     },
     check_stats: {
-      title: 'Fetching Stats',
+      title: '📊 Fetching Stats',
       steps: [
-        { key: 'get_stats', label: 'Querying campaign database', sub: '' },
+        { key: 'get_stats', label: 'Querying campaign database', sub: 'sent · reach · success rate' },
         { key: 'done', label: 'Stats ready', sub: '' }
       ]
     },
-    manage_campaign: {
-      title: 'Managing Campaign',
+    list_campaigns: {
+      title: '📋 Loading Campaigns',
       steps: [
-        { key: 'get_campaigns', label: 'Finding campaigns', sub: '' },
-        { key: 'approve_campaign|cancel_campaign|fire_campaign_now', label: 'Applying action', sub: '' },
-        { key: 'done', label: 'Done', sub: '' }
+        { key: 'get_campaigns', label: 'Searching campaign database', sub: 'applying filters' },
+        { key: 'done', label: 'Campaigns loaded', sub: '' }
+      ]
+    },
+    approve_campaign: {
+      title: '✅ Approving Campaign',
+      steps: [
+        { key: 'get_campaigns', label: 'Finding campaign', sub: '' },
+        { key: 'approve_campaign', label: 'Approving campaign', sub: 'will fire at scheduled time' },
+        { key: 'done', label: 'Campaign approved!', sub: '' }
+      ]
+    },
+    cancel_campaign: {
+      title: '❌ Cancelling Campaign',
+      steps: [
+        { key: 'get_campaigns', label: 'Finding campaign', sub: '' },
+        { key: 'cancel_campaign', label: 'Cancelling campaign', sub: 'moving back to Draft' },
+        { key: 'done', label: 'Campaign cancelled', sub: '' }
+      ]
+    },
+    fire_campaign: {
+      title: '🔥 Firing Campaign Now',
+      steps: [
+        { key: 'get_campaigns', label: 'Finding campaign', sub: '' },
+        { key: 'fire_campaign_now', label: 'Firing to CleverTap', sub: 'sending immediately' },
+        { key: 'done', label: 'Campaign fired!', sub: '' }
       ]
     },
     check_performance: {
-      title: 'Checking Performance',
+      title: '📈 Fetching Performance',
+      steps: [
+        { key: 'get_campaigns', label: 'Finding campaign', sub: '' },
+        { key: 'get_campaign_performance', label: 'Fetching from CleverTap', sub: 'sent · clicked · CTR' },
+        { key: 'done', label: 'Performance loaded', sub: '' }
+      ]
+    },
+    check_performance_direct: {
+      title: '📈 Fetching Performance',
       steps: [
         { key: 'get_campaign_performance', label: 'Fetching from CleverTap', sub: 'sent · clicked · CTR' },
         { key: 'done', label: 'Performance loaded', sub: '' }
       ]
+    },
+    check_retailers: {
+      title: '🛍️ Loading Retailers',
+      steps: [
+        { key: 'get_all_retailers', label: 'Fetching retailer database', sub: 'rates & deep links' },
+        { key: 'done', label: 'Retailers loaded', sub: '' }
+      ]
+    },
+    check_retailer: {
+      title: '🔍 Looking Up Retailer',
+      steps: [
+        { key: 'get_retailer', label: 'Searching retailer database', sub: 'rate & deep link' },
+        { key: 'done', label: 'Retailer found', sub: '' }
+      ]
+    },
+    check_audiences: {
+      title: '🎯 Analysing Audiences',
+      steps: [
+        { key: 'get_segment_performance', label: 'Loading performance history', sub: 'CTR by segment' },
+        { key: 'done', label: 'Audience data ready', sub: '' }
+      ]
+    },
+    save_knowledge: {
+      title: '💾 Saving to Knowledge Base',
+      steps: [
+        { key: 'save_to_knowledge_base', label: 'Saving correction', sub: 'will apply to future responses' },
+        { key: 'done', label: 'Saved!', sub: '' }
+      ]
+    },
+    generic: {
+      title: '⚙️ Working on it...',
+      steps: [
+        { key: '__any__', label: 'Processing your request', sub: '' },
+        { key: 'done', label: 'Done', sub: '' }
+      ]
     }
   };
 
-  // Detect which flow based on first tool called
+  // Detect flow from FIRST tool called in a message
   function detectFlow(toolName) {
-    if (['get_retailer', 'create_and_send'].includes(toolName)) return 'create_campaign';
+    if (toolName === 'create_and_send') return 'create_campaign';
     if (toolName === 'create_and_schedule') return 'schedule_campaign';
     if (toolName === 'get_stats') return 'check_stats';
-    if (['get_campaigns','approve_campaign','cancel_campaign','fire_campaign_now'].includes(toolName)) return 'manage_campaign';
-    if (toolName === 'get_campaign_performance') return 'check_performance';
-    return null;
+    if (toolName === 'get_all_retailers') return 'check_retailers';
+    if (toolName === 'get_campaign_performance') return 'check_performance_direct';
+    if (toolName === 'save_to_knowledge_base') return 'save_knowledge';
+    // For get_retailer — peek at context to decide if creating or just looking up
+    if (toolName === 'get_retailer') return 'check_retailer';
+    if (toolName === 'get_segment_performance') return 'check_audiences';
+    // For get_campaigns — will refine once we see next tool
+    if (toolName === 'get_campaigns') return 'list_campaigns';
+    if (toolName === 'approve_campaign') return 'approve_campaign';
+    if (toolName === 'cancel_campaign') return 'cancel_campaign';
+    if (toolName === 'fire_campaign_now') return 'fire_campaign';
+    return 'generic';
+  }
+
+  // Upgrade flow mid-execution when we learn more about what Claude is doing
+  function upgradeFlow(currentFlowKey, newToolName) {
+    // If we started with retailer lookup and now creating → upgrade to create flow
+    if (currentFlowKey === 'check_retailer' && newToolName === 'get_segment_performance') return 'create_campaign';
+    if (currentFlowKey === 'check_retailer' && newToolName === 'create_and_send') return 'create_campaign';
+    if (currentFlowKey === 'check_retailer' && newToolName === 'create_and_schedule') return 'schedule_campaign';
+    // If listing campaigns and then action follows → upgrade
+    if (currentFlowKey === 'list_campaigns' && newToolName === 'approve_campaign') return 'approve_campaign';
+    if (currentFlowKey === 'list_campaigns' && newToolName === 'cancel_campaign') return 'cancel_campaign';
+    if (currentFlowKey === 'list_campaigns' && newToolName === 'fire_campaign_now') return 'fire_campaign';
+    if (currentFlowKey === 'list_campaigns' && newToolName === 'get_campaign_performance') return 'check_performance';
+    return null; // no upgrade
   }
 
   class ProgressTracker {
     constructor(flowKey, containerEl) {
+      this.flowKey = flowKey;
       this.flow = TASK_FLOWS[flowKey];
       this.el = containerEl;
       this.currentStep = 0;
-      this.stepEls = [];
+      this.render();
+    }
+
+    upgradeToFlow(newFlowKey) {
+      if (newFlowKey === this.flowKey) return;
+      this.flowKey = newFlowKey;
+      this.flow = TASK_FLOWS[newFlowKey];
+      this.currentStep = 0;
       this.render();
     }
 
@@ -1675,13 +1831,11 @@ ${retailerCache}`;
           <div class="progress-steps">${stepsHtml}</div>
         </div>`;
 
-      // Activate first step
       this.activateStep(0);
     }
 
     activateStep(i) {
       if (!this.flow || i >= this.flow.steps.length) return;
-      // Mark previous done
       if (i > 0) {
         const prev = this.el.querySelector(`#ps_${i-1}`);
         if (prev) {
@@ -1690,40 +1844,45 @@ ${retailerCache}`;
           prev.querySelector('.progress-step-icon').textContent = '✓';
         }
       }
-      // Activate current
       const cur = this.el.querySelector(`#ps_${i}`);
       if (cur) {
         cur.classList.remove('pending');
         cur.classList.add('active');
         cur.querySelector('.progress-step-icon').textContent = '↻';
       }
-      // Update bar
       const bar = this.el.querySelector('#prog_bar');
       if (bar) {
-        const pct = Math.round(((i) / this.flow.steps.length) * 100);
+        const pct = Math.round((i / this.flow.steps.length) * 100);
         bar.style.width = pct + '%';
       }
       this.currentStep = i;
-      // Scroll into view
       this.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     advanceByTool(toolName) {
       if (!this.flow) return;
-      // Find matching step
+      // Generic flow — always advance
+      if (this.flowKey === 'generic') {
+        this.activateStep(0);
+        return;
+      }
       for (let i = this.currentStep; i < this.flow.steps.length; i++) {
         const stepKeys = this.flow.steps[i].key.split('|');
-        if (stepKeys.includes(toolName)) {
+        if (stepKeys.includes(toolName) || stepKeys.includes('__any__')) {
           this.activateStep(i);
           return;
         }
+      }
+      // Tool not in current steps — advance to next pending step anyway
+      const nextPending = this.currentStep + 1;
+      if (nextPending < this.flow.steps.length - 1) {
+        this.activateStep(nextPending);
       }
     }
 
     complete(success = true) {
       if (!this.flow) return;
       const total = this.flow.steps.length;
-      // Mark all done
       for (let i = 0; i < total; i++) {
         const el = this.el.querySelector(`#ps_${i}`);
         if (el) {
@@ -1769,10 +1928,10 @@ ${retailerCache}`;
     setLoading(true);
     const typingEl = addTyping();
 
-    // Progress tracker state
+    // Progress tracker — always shown for every tool call
     let progressEl = null;
     let tracker = null;
-    let flowDetected = false;
+    let currentFlowKey = null;
 
     try {
       let messages = [...conversationHistory];
@@ -1799,7 +1958,6 @@ ${retailerCache}`;
         const data = await response.json();
         const content = data.content || [];
 
-        // Process response
         let hasToolUse = false;
         const toolResults = [];
 
@@ -1811,28 +1969,32 @@ ${retailerCache}`;
             hasToolUse = true;
             finalResponse = '';
 
-            // Detect and init progress tracker on first tool
-            if (!flowDetected) {
-              flowDetected = true;
-              const flowKey = detectFlow(block.name);
-              if (flowKey) {
-                typingEl.remove();
-                progressEl = document.createElement('div');
-                progressEl.className = 'message agent';
-                progressEl.innerHTML = `<div class="avatar" style="background:linear-gradient(135deg,var(--orange),var(--orange-dark));color:white">CK</div><div id="progress_inner"></div>`;
-                document.getElementById('messages').appendChild(progressEl);
-                document.getElementById('messages').scrollTop = 99999;
-                tracker = new ProgressTracker(flowKey, progressEl.querySelector('#progress_inner'));
+            // Init progress on FIRST tool — always, for every request
+            if (!progressEl) {
+              currentFlowKey = detectFlow(block.name);
+              typingEl.remove();
+              progressEl = document.createElement('div');
+              progressEl.className = 'message agent';
+              progressEl.innerHTML = `<div class="avatar" style="background:linear-gradient(135deg,var(--orange),var(--orange-dark));color:white;box-shadow:0 4px 12px rgba(255,107,53,0.25)">CK</div><div id="progress_inner"></div>`;
+              document.getElementById('messages').appendChild(progressEl);
+              document.getElementById('messages').scrollTop = 99999;
+              tracker = new ProgressTracker(currentFlowKey, progressEl.querySelector('#progress_inner'));
+            } else {
+              // Check if we should upgrade the flow mid-execution
+              const upgraded = upgradeFlow(currentFlowKey, block.name);
+              if (upgraded) {
+                currentFlowKey = upgraded;
+                tracker.upgradeToFlow(upgraded);
               }
             }
 
             // Advance progress to this tool
-            if (tracker) tracker.advanceByTool(block.name);
+            tracker.advanceByTool(block.name);
 
             // Execute tool
             const result = await executeTool(block.name, block.input);
 
-            // Render rich result (hidden inside toolCallsHtml, shown after progress)
+            // Accumulate rich results to show after progress completes
             toolCallsHtml += renderToolResult(block.name, block.input, result);
 
             toolResults.push({
@@ -1843,7 +2005,6 @@ ${retailerCache}`;
           }
         }
 
-        // After tool results
         if (hasToolUse && data.stop_reason !== 'tool_use') {
           for (const block of content) {
             if (block.type === 'text') finalResponse += block.text;
@@ -1860,21 +2021,19 @@ ${retailerCache}`;
         }
       }
 
-      // Complete progress
+      // Complete progress — green tick, full bar, then replace with results
       if (tracker) {
         tracker.complete(true);
-        // Small delay then replace progress with actual results
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 700));
         if (progressEl) progressEl.remove();
       } else if (typingEl.parentNode) {
         typingEl.remove();
       }
 
-      // Build final HTML
+      // Show results
       let html = '';
       if (toolCallsHtml) html += toolCallsHtml;
       if (finalResponse) html += formatText(finalResponse);
-
       if (html) addMessage('agent', html, true);
 
       conversationHistory.push({ role: 'assistant', content: finalResponse || 'Done.' });
@@ -2031,8 +2190,36 @@ ${retailerCache}`;
     }
   }
 
+  function togglePwVisibility() {
+    const input = document.getElementById('passwordInput');
+    const btn = document.getElementById('pwToggle');
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '🙈';
+      btn.style.color = 'var(--orange)';
+    } else {
+      input.type = 'password';
+      btn.textContent = '👁';
+      btn.style.color = 'rgba(255,255,255,0.4)';
+    }
+  }
+
+  function toggleTheme() {
+    const body = document.body;
+    const btn = document.getElementById('themeToggle');
+    const isLight = body.classList.toggle('light');
+    btn.textContent = isLight ? '🌙' : '☀️';
+    localStorage.setItem('ck_theme', isLight ? 'light' : 'dark');
+  }
+
   // Check if already authenticated this session
   window.addEventListener('load', () => {
+    // Restore theme preference
+    if (localStorage.getItem('ck_theme') === 'light') {
+      document.body.classList.add('light');
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.textContent = '☀️';
+    }
     if (sessionStorage.getItem('ck_auth') === '1') {
       document.getElementById('loginGate').style.display = 'none';
       document.getElementById('appWrapper').classList.add('visible');
