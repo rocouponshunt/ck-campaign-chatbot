@@ -746,6 +746,7 @@
   <div class="suggestion-chip" onclick="sendSuggestion('Show pending approval campaigns')">⏳ Pending approval</div>
   <div class="suggestion-chip" onclick="sendSuggestion('I want to create a new push campaign')">🚀 Create campaign</div>
   <div class="suggestion-chip" onclick="sendSuggestion('I want to schedule a campaign for later')">📅 Schedule campaign</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('Show me all active retailers and their cashback rates')">🛍️ Retailers & rates</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show campaigns for Myntra')">🛍️ Myntra campaigns</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show all draft campaigns')">📝 Drafts</div>
 </div>
@@ -925,17 +926,59 @@
       input_schema: {
         type: "object",
         properties: {
-          category: { type: "string", description: "Category: Corrections, Segment Rules, Events, User Properties, Examples" },
+          category: { type: "string", description: "Category: Corrections, Segment Rules, Events, User Properties, Examples, Retailer Rules" },
           title: { type: "string", description: "Short descriptive title for this entry" },
           content: { type: "string", description: "The actual rule, correction, or example to save" }
         },
         required: ["category", "title", "content"]
+      }
+    },
+    {
+      name: "get_retailer",
+      description: "Get retailer info — deep link, cashback rate, reward type — for a specific brand. ALWAYS call this before creating any campaign so you have the correct deep link and cashback rate for copy.",
+      input_schema: {
+        type: "object",
+        properties: {
+          brand: { type: "string", description: "Brand/retailer name e.g. Myntra, Adidas, Amazon" }
+        },
+        required: ["brand"]
+      }
+    },
+    {
+      name: "get_all_retailers",
+      description: "Get list of all active retailers with their deep links and cashback rates. Use when user asks what retailers are available or when suggesting campaign ideas.",
+      input_schema: {
+        type: "object",
+        properties: {}
+      }
+    },
+    {
+      name: "get_segment_performance",
+      description: "Get historical CTR performance data for segments used with a specific brand. Use this to make data-driven audience recommendations.",
+      input_schema: {
+        type: "object",
+        properties: {
+          brand: { type: "string", description: "Brand name to get segment performance for" }
+        },
+        required: ["brand"]
+      }
+    },
+    {
+      name: "get_campaign_performance",
+      description: "Get performance stats (sent, clicked, CTR) for a specific campaign from CleverTap.",
+      input_schema: {
+        type: "object",
+        properties: {
+          campaign_id: { type: "string", description: "Supabase campaign UUID" }
+        },
+        required: ["campaign_id"]
       }
     }
   ];
 
   // Dynamic KB from Supabase
   let dynamicKnowledgeBase = '';
+  let retailerCache = '';
 
   async function loadKnowledgeBase() {
     try {
@@ -948,6 +991,18 @@
       }
     } catch(e) {
       console.log('KB load skipped:', e.message);
+    }
+    // Also preload retailers
+    try {
+      const r = await callEdge({ action: 'get_all_retailers' });
+      if (r.retailers && r.retailers.length > 0) {
+        retailerCache = '\n\n## ACTIVE RETAILERS (use these for deep links and copy)\n';
+        r.retailers.forEach(ret => {
+          retailerCache += `- ${ret.retailer_name}: ${ret.rate_label || ''} | deep_link: ${ret.deep_link}\n`;
+        });
+      }
+    } catch(e) {
+      console.log('Retailer cache skipped:', e.message);
     }
   }
 
@@ -979,10 +1034,33 @@ If user corrects any output (wrong JSON, wrong segment, wrong copy, wrong dates)
 2. Ask: "Got it! Should I save this to the knowledge base so I always get this right? Reply 'save it'."
 3. If user says "save it" / "yes save" / "haan save karo" → call save_to_knowledge_base
 
-## Create Campaign Workflow
-Step 1 — Gather: brand, target audience, message, send now or schedule?
-Step 2 — Generate & show review card with all details. Ask for confirm.
-Step 3 — Only after "confirm" → call tool.
+## RETAILER DATA RULE — CRITICAL
+ALWAYS call get_retailer tool BEFORE creating any campaign for a specific brand.
+Never guess or make up deep links or cashback rates.
+The retailer data gives you:
+- Exact deep_link to use (e.g. https://cashkaro.com/stores/adidas)
+- rate_label for copy (e.g. "Flat 10% Cashback" or "Upto 5% Rewards")
+- reward_type: use "Cashback" or "Rewards" correctly in copy
+  Rewards retailers (Amazon, Flipkart): say "Earn X% Rewards" not Cashback
+  Cashback retailers: say "X% Cashback"
+  Flat = guaranteed. Upto = maximum possible.
+
+## AUDIENCE RECOMMENDATION RULE
+When user specifies a brand, ALWAYS call get_segment_performance first.
+If data exists → show data-driven recommendations ranked by historical CTR.
+If no data yet → show logical recommendations based on intent.
+Format as numbered options with CTR data when available:
+🥇 Option 1: [segment] — Historical CTR: X% (N campaigns)
+🥈 Option 2: [segment] — Historical CTR: X% (N campaigns)
+🥉 Option 3: [segment] — New audience, no data yet
+
+## Create Campaign Workflow (UPDATED)
+Step 1 — Get brand → call get_retailer → get deep link + rate
+Step 2 — Get goal (retention/acquisition/reactivation/flash sale etc.)
+Step 3 — Call get_segment_performance → show data-driven audience options
+Step 4 — User picks audience → generate segment JSON + CASHvertising copy using actual cashback rate
+Step 5 — Show review card → ask confirm
+Step 6 — Only after confirm → call create_and_send or create_and_schedule
 
 Review card format:
 📋 CAMPAIGN REVIEW
@@ -1030,7 +1108,8 @@ Schedule: same as create but ask date/time. Default time = 18:00 IST.
 - Numbers: Indian format (1,37,180)
 - CleverTap URLs: always rendered as clickable links
 - Show campaign ID after every action
-${dynamicKnowledgeBase}`;
+${dynamicKnowledgeBase}
+${retailerCache}`;
   }
 
   // ============================================================
@@ -1199,6 +1278,22 @@ ${dynamicKnowledgeBase}`;
       }
     }
 
+    else if (toolName === 'get_retailer') {
+      return await callEdge({ action: 'get_retailer', brand: toolInput.brand });
+    }
+
+    else if (toolName === 'get_all_retailers') {
+      return await callEdge({ action: 'get_all_retailers' });
+    }
+
+    else if (toolName === 'get_segment_performance') {
+      return await callEdge({ action: 'get_segment_performance', brand: toolInput.brand });
+    }
+
+    else if (toolName === 'get_campaign_performance') {
+      return await callEdge({ action: 'get_campaign_performance', campaign_id: toolInput.campaign_id });
+    }
+
     return { error: 'Unknown tool' };
   }
 
@@ -1304,6 +1399,53 @@ ${dynamicKnowledgeBase}`;
           ${result.url ? `<a href="${result.url}" target="_blank" class="ct-link">↗ View in CleverTap</a>` : ''}`;
       }
       return `<div class="action-result error">❌ Campaign failed to send.</div>`;
+    }
+
+    if (toolName === 'get_retailer') {
+      if (!result.found) return `<div class="action-result error">❌ Retailer not found in database. You can add it in Lovable → Retailers page.</div>`;
+      const r = result.retailer;
+      return `
+        <div class="stat-block">
+          <div class="stat-row"><span class="stat-label">Retailer</span><span class="stat-value highlight">${r.retailer_name}</span></div>
+          <div class="stat-row"><span class="stat-label">Rate</span><span class="stat-value">${r.rate_label || r.headline_rate}</span></div>
+          <div class="stat-row"><span class="stat-label">Type</span><span class="stat-value">${r.reward_type || '—'}</span></div>
+          <div class="stat-row"><span class="stat-label">Deep Link</span><span class="stat-value" style="font-family:'DM Mono',monospace;font-size:11px">${r.deep_link}</span></div>
+          <div class="stat-row"><span class="stat-label">Cashback Active</span><span class="stat-value">${r.cashback_active ? '✅ Yes' : '❌ No'}</span></div>
+        </div>`;
+    }
+
+    if (toolName === 'get_all_retailers') {
+      const retailers = result.retailers || [];
+      if (!retailers.length) return '<em>No active retailers found.</em>';
+      return `<div class="stat-block">${retailers.map(r =>
+        `<div class="stat-row"><span class="stat-label">${r.retailer_name}</span><span class="stat-value">${r.rate_label || '—'}</span></div>`
+      ).join('')}</div>`;
+    }
+
+    if (toolName === 'get_segment_performance') {
+      const segs = result.segments || [];
+      if (!segs.length) return `<div class="action-result" style="background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--text-muted)">📊 ${result.message || 'No CTR data yet for this brand. Recommendations are based on best practices.'}</div>`;
+      return `
+        <div class="stat-block">
+          <div class="stat-row" style="font-weight:600"><span class="stat-label">Segment</span><span class="stat-value">Avg CTR | Campaigns</span></div>
+          ${segs.map((s, i) => {
+            const medal = ['🥇','🥈','🥉','4️⃣','5️⃣'][i] || `${i+1}.`;
+            return `<div class="stat-row"><span class="stat-label">${medal} ${s.segment_name}</span><span class="stat-value highlight">${s.avg_ctr}% CTR · ${s.campaigns_count} campaigns</span></div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    if (toolName === 'get_campaign_performance') {
+      if (!result || result.error) return `<div class="action-result error">❌ Could not fetch performance data.</div>`;
+      const ctrColor = result.ct_ctr >= 5 ? '#10B981' : result.ct_ctr >= 2 ? '#F59E0B' : '#EF4444';
+      return `
+        <div class="stat-block">
+          <div class="stat-row"><span class="stat-label">Sent</span><span class="stat-value">${(result.ct_sent||0).toLocaleString('en-IN')}</span></div>
+          <div class="stat-row"><span class="stat-label">Clicked</span><span class="stat-value">${(result.ct_clicked||0).toLocaleString('en-IN')}</span></div>
+          <div class="stat-row"><span class="stat-label">CTR</span><span class="stat-value" style="color:${ctrColor};font-weight:700">${result.ct_ctr || 0}%</span></div>
+          <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value">${result.ct_is_final ? '✅ Final' : '🔄 Still updating'}</span></div>
+          ${result.ct_last_synced ? `<div class="stat-row"><span class="stat-label">Last Synced</span><span class="stat-value">${new Date(result.ct_last_synced).toLocaleString('en-IN')}</span></div>` : ''}
+        </div>`;
     }
 
     if (toolName === 'save_to_knowledge_base') {
