@@ -482,6 +482,132 @@
     font-size: 10px;
   }
 
+  /* PROGRESS SYSTEM */
+  .progress-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin: 4px 0;
+    min-width: 280px;
+    max-width: 400px;
+  }
+
+  .progress-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .progress-title-dot {
+    width: 6px; height: 6px;
+    background: var(--orange);
+    border-radius: 50%;
+    animation: pulse-dot 1s infinite;
+  }
+
+  .progress-bar-track {
+    height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 100px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--orange), var(--orange-dark));
+    border-radius: 100px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; right: 0; bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 200%; }
+  }
+
+  .progress-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .progress-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    transition: all 0.3s ease;
+  }
+
+  .progress-step-icon {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+  }
+
+  .progress-step.pending .progress-step-icon {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-dim);
+  }
+
+  .progress-step.pending .progress-step-label {
+    color: var(--text-dim);
+  }
+
+  .progress-step.active .progress-step-icon {
+    background: rgba(255,107,53,0.15);
+    border: 1px solid rgba(255,107,53,0.4);
+    color: var(--orange);
+    animation: spin 1s linear infinite;
+  }
+
+  .progress-step.active .progress-step-label {
+    color: var(--orange);
+    font-weight: 500;
+  }
+
+  .progress-step.done .progress-step-icon {
+    background: rgba(16,185,129,0.15);
+    border: 1px solid rgba(16,185,129,0.3);
+    color: var(--success);
+  }
+
+  .progress-step.done .progress-step-label {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-color: rgba(16,185,129,0.4);
+  }
+
+  .progress-step.error .progress-step-icon {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: var(--error);
+  }
+
+  .progress-step-label { font-size: 13px; line-height: 1.3; }
+  .progress-step-sub { font-size: 11px; color: var(--text-dim); margin-top: 1px; font-family: 'DM Mono', monospace; }
+
   .tool-call-spinner {
     width: 12px;
     height: 12px;
@@ -1458,6 +1584,168 @@ ${retailerCache}`;
   }
 
   // ============================================================
+  // PROGRESS MANAGER
+  // ============================================================
+
+  // Maps tool sequences to human-readable task flows
+  const TASK_FLOWS = {
+    create_campaign: {
+      title: 'Creating Campaign',
+      steps: [
+        { key: 'get_retailer', label: 'Fetching retailer info', sub: 'deep link & cashback rate' },
+        { key: 'get_segment_performance', label: 'Checking best audiences', sub: 'historical CTR data' },
+        { key: 'thinking', label: 'Generating copy', sub: 'CASHvertising-optimised' },
+        { key: 'create_and_send', label: 'Firing campaign', sub: 'calling CleverTap API' },
+        { key: 'done', label: 'Campaign live!', sub: '' }
+      ]
+    },
+    schedule_campaign: {
+      title: 'Scheduling Campaign',
+      steps: [
+        { key: 'get_retailer', label: 'Fetching retailer info', sub: 'deep link & cashback rate' },
+        { key: 'get_segment_performance', label: 'Checking best audiences', sub: 'historical CTR data' },
+        { key: 'thinking', label: 'Generating copy', sub: 'CASHvertising-optimised' },
+        { key: 'create_and_schedule', label: 'Scheduling campaign', sub: 'saving to calendar' },
+        { key: 'done', label: 'Scheduled!', sub: '' }
+      ]
+    },
+    check_stats: {
+      title: 'Fetching Stats',
+      steps: [
+        { key: 'get_stats', label: 'Querying campaign database', sub: '' },
+        { key: 'done', label: 'Stats ready', sub: '' }
+      ]
+    },
+    manage_campaign: {
+      title: 'Managing Campaign',
+      steps: [
+        { key: 'get_campaigns', label: 'Finding campaigns', sub: '' },
+        { key: 'approve_campaign|cancel_campaign|fire_campaign_now', label: 'Applying action', sub: '' },
+        { key: 'done', label: 'Done', sub: '' }
+      ]
+    },
+    check_performance: {
+      title: 'Checking Performance',
+      steps: [
+        { key: 'get_campaign_performance', label: 'Fetching from CleverTap', sub: 'sent · clicked · CTR' },
+        { key: 'done', label: 'Performance loaded', sub: '' }
+      ]
+    }
+  };
+
+  // Detect which flow based on first tool called
+  function detectFlow(toolName) {
+    if (['get_retailer', 'create_and_send'].includes(toolName)) return 'create_campaign';
+    if (toolName === 'create_and_schedule') return 'schedule_campaign';
+    if (toolName === 'get_stats') return 'check_stats';
+    if (['get_campaigns','approve_campaign','cancel_campaign','fire_campaign_now'].includes(toolName)) return 'manage_campaign';
+    if (toolName === 'get_campaign_performance') return 'check_performance';
+    return null;
+  }
+
+  class ProgressTracker {
+    constructor(flowKey, containerEl) {
+      this.flow = TASK_FLOWS[flowKey];
+      this.el = containerEl;
+      this.currentStep = 0;
+      this.stepEls = [];
+      this.render();
+    }
+
+    render() {
+      if (!this.flow) return;
+      const stepsHtml = this.flow.steps.map((s, i) => `
+        <div class="progress-step pending" id="ps_${i}">
+          <div class="progress-step-icon">${i + 1}</div>
+          <div>
+            <div class="progress-step-label">${s.label}</div>
+            ${s.sub ? `<div class="progress-step-sub">${s.sub}</div>` : ''}
+          </div>
+        </div>`).join('');
+
+      this.el.innerHTML = `
+        <div class="progress-container">
+          <div class="progress-title">
+            <div class="progress-title-dot"></div>
+            ${this.flow.title}
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="prog_bar" style="width:0%"></div>
+          </div>
+          <div class="progress-steps">${stepsHtml}</div>
+        </div>`;
+
+      // Activate first step
+      this.activateStep(0);
+    }
+
+    activateStep(i) {
+      if (!this.flow || i >= this.flow.steps.length) return;
+      // Mark previous done
+      if (i > 0) {
+        const prev = this.el.querySelector(`#ps_${i-1}`);
+        if (prev) {
+          prev.classList.remove('active');
+          prev.classList.add('done');
+          prev.querySelector('.progress-step-icon').textContent = '✓';
+        }
+      }
+      // Activate current
+      const cur = this.el.querySelector(`#ps_${i}`);
+      if (cur) {
+        cur.classList.remove('pending');
+        cur.classList.add('active');
+        cur.querySelector('.progress-step-icon').textContent = '↻';
+      }
+      // Update bar
+      const bar = this.el.querySelector('#prog_bar');
+      if (bar) {
+        const pct = Math.round(((i) / this.flow.steps.length) * 100);
+        bar.style.width = pct + '%';
+      }
+      this.currentStep = i;
+      // Scroll into view
+      this.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    advanceByTool(toolName) {
+      if (!this.flow) return;
+      // Find matching step
+      for (let i = this.currentStep; i < this.flow.steps.length; i++) {
+        const stepKeys = this.flow.steps[i].key.split('|');
+        if (stepKeys.includes(toolName)) {
+          this.activateStep(i);
+          return;
+        }
+      }
+    }
+
+    complete(success = true) {
+      if (!this.flow) return;
+      const total = this.flow.steps.length;
+      // Mark all done
+      for (let i = 0; i < total; i++) {
+        const el = this.el.querySelector(`#ps_${i}`);
+        if (el) {
+          el.classList.remove('pending', 'active');
+          el.classList.add(success ? 'done' : 'error');
+          el.querySelector('.progress-step-icon').textContent = success ? '✓' : '✗';
+        }
+      }
+      const bar = this.el.querySelector('#prog_bar');
+      if (bar) {
+        bar.style.width = '100%';
+        if (!success) bar.style.background = 'var(--error)';
+      }
+      const dot = this.el.querySelector('.progress-title-dot');
+      if (dot) {
+        dot.style.animation = 'none';
+        dot.style.background = success ? 'var(--success)' : 'var(--error)';
+      }
+    }
+  }
+
+  // ============================================================
   // MAIN SEND FUNCTION
   // ============================================================
   async function sendMessage(text) {
@@ -1480,6 +1768,11 @@ ${retailerCache}`;
     // Show typing
     setLoading(true);
     const typingEl = addTyping();
+
+    // Progress tracker state
+    let progressEl = null;
+    let tracker = null;
+    let flowDetected = false;
 
     try {
       let messages = [...conversationHistory];
@@ -1512,24 +1805,34 @@ ${retailerCache}`;
 
         for (const block of content) {
           if (block.type === 'text' && !hasToolUse) {
-            // Only collect text if no tool use has happened yet
             finalResponse += block.text;
           }
           if (block.type === 'tool_use') {
             hasToolUse = true;
-            finalResponse = ''; // Clear any text before tool use — tool result is the response
+            finalResponse = '';
 
-            // Show tool call indicator
-            toolCallsHtml += `
-              <div class="tool-call">
-                <div class="tool-call-icon">⚙</div>
-                <span>Calling ${block.name.replace(/_/g, ' ')}...</span>
-              </div>`;
+            // Detect and init progress tracker on first tool
+            if (!flowDetected) {
+              flowDetected = true;
+              const flowKey = detectFlow(block.name);
+              if (flowKey) {
+                typingEl.remove();
+                progressEl = document.createElement('div');
+                progressEl.className = 'message agent';
+                progressEl.innerHTML = `<div class="avatar" style="background:linear-gradient(135deg,var(--orange),var(--orange-dark));color:white">CK</div><div id="progress_inner"></div>`;
+                document.getElementById('messages').appendChild(progressEl);
+                document.getElementById('messages').scrollTop = 99999;
+                tracker = new ProgressTracker(flowKey, progressEl.querySelector('#progress_inner'));
+              }
+            }
+
+            // Advance progress to this tool
+            if (tracker) tracker.advanceByTool(block.name);
 
             // Execute tool
             const result = await executeTool(block.name, block.input);
 
-            // Render rich result
+            // Render rich result (hidden inside toolCallsHtml, shown after progress)
             toolCallsHtml += renderToolResult(block.name, block.input, result);
 
             toolResults.push({
@@ -1540,7 +1843,7 @@ ${retailerCache}`;
           }
         }
 
-        // After tool results, capture Claude's follow-up text summary
+        // After tool results
         if (hasToolUse && data.stop_reason !== 'tool_use') {
           for (const block of content) {
             if (block.type === 'text') finalResponse += block.text;
@@ -1548,35 +1851,40 @@ ${retailerCache}`;
         }
 
         if (hasToolUse) {
-          // Add assistant message with tool use to history
           messages.push({ role: 'assistant', content: content });
-          // Add tool results
           messages.push({ role: 'user', content: toolResults });
-          // Continue loop if Claude wants to process results
           continueLoop = data.stop_reason === 'tool_use';
-          // Reset finalResponse for next iteration — only show tool cards
           finalResponse = '';
         } else {
           continueLoop = false;
         }
       }
 
-      // Remove typing
-      typingEl.remove();
+      // Complete progress
+      if (tracker) {
+        tracker.complete(true);
+        // Small delay then replace progress with actual results
+        await new Promise(r => setTimeout(r, 600));
+        if (progressEl) progressEl.remove();
+      } else if (typingEl.parentNode) {
+        typingEl.remove();
+      }
 
       // Build final HTML
       let html = '';
       if (toolCallsHtml) html += toolCallsHtml;
       if (finalResponse) html += formatText(finalResponse);
 
-      addMessage('agent', html, true);
+      if (html) addMessage('agent', html, true);
 
-      // Update history
       conversationHistory.push({ role: 'assistant', content: finalResponse || 'Done.' });
 
     } catch (err) {
-      typingEl.remove();
-      addMessage('agent', `<div class="action-result error">❌ Error: ${err.message}</div>`, true);
+      if (tracker) tracker.complete(false);
+      else if (typingEl.parentNode) typingEl.remove();
+      setTimeout(() => {
+        addMessage('agent', `<div class="action-result error">❌ Error: ${err.message}</div>`, true);
+      }, 400);
     }
 
     setLoading(false);
