@@ -1295,6 +1295,33 @@ Schedule: same as create but ask date/time. Default time = 18:00 IST.
 - Numbers: Indian format (1,37,180)
 - CleverTap URLs: always rendered as clickable links
 - Show campaign ID after every action
+## TARGETING LIMITATIONS — CRITICAL
+CleverTap API does NOT support:
+- OR logic across multiple Retailer values
+- Targeting "transacted on Brand A OR Brand B OR Brand C" in one query
+- Complex include/exclude multi-segment combinations
+
+When user wants multi-brand targeting:
+1. Immediately state the limitation clearly
+2. Offer 2-3 concrete working alternatives WITH the exact JSON shown inline
+3. Never attempt create_and_send or create_and_schedule with an uncertain JSON
+4. Never ask more than 2 clarifying questions in a row — after 2 questions, 
+   show pre-built JSON options for user to pick from directly
+
+Working alternatives for multi-brand beauty targeting:
+- Single best brand: last_transaction_retailer equals "Dot & Key"
+- Lifecycle segment: june_26_segment_name equals "1-Champion"  
+- Store visitors: event_name=Store_Page + event_properties store_name equals brand
+
+If unsure whether JSON will work — say so explicitly and offer to test 
+with a known-working simpler alternative first. Never loop.
+
+## ANTI-LOOP RULE
+If you have asked the same type of clarifying question more than twice 
+and still cannot build the JSON — STOP asking. Instead show 3 ready-to-use 
+campaign options with complete JSONs and let the user pick one number. 
+This prevents infinite back-and-forth loops.
+
 ${dynamicKnowledgeBase}
 ${retailerCache}`;
   }
