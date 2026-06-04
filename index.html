@@ -1550,17 +1550,8 @@ ${dynamicKnowledgeBase}`;
   // ============================================================
   // PASSWORD PROTECTION
   // Password: ckagent2026
-  // Stored as SHA-256 hash — never plain text in source
   // ============================================================
-  const PASSWORD_HASH = '70676564fa31883187967aae06a7309530b18a0eeebe5c1ccebb37b97e5bd0c0';
-
-  async function hashPassword(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password + 'ck_salt_2026');
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
+  const ENCODED_PW = btoa('ckagent2026' + ':ck2026');
 
   async function checkPassword() {
     const input = document.getElementById('passwordInput').value;
@@ -1572,10 +1563,9 @@ ${dynamicKnowledgeBase}`;
     btn.textContent = 'Verifying...';
     btn.disabled = true;
 
-    const hash = await hashPassword(input);
+    const correct = btoa(input + ':ck2026') === ENCODED_PW;
 
-    if (hash === PASSWORD_HASH) {
-      // Correct — store session and show app
+    if (correct) {
       sessionStorage.setItem('ck_auth', '1');
       document.getElementById('loginGate').style.display = 'none';
       document.getElementById('appWrapper').classList.add('visible');
@@ -1586,7 +1576,6 @@ ${dynamicKnowledgeBase}`;
       document.getElementById('passwordInput').focus();
       btn.textContent = 'Access Campaign Agent →';
       btn.disabled = false;
-      // Shake animation
       document.querySelector('.login-box').style.animation = 'shake 0.4s ease';
       setTimeout(() => document.querySelector('.login-box').style.animation = '', 400);
     }
