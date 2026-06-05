@@ -2247,7 +2247,20 @@ ${retailerCache}`;
       const btn = document.getElementById('themeToggle');
       if (btn) btn.textContent = '☀️';
     }
-    if (sessionStorage.getItem('ck_auth') === '1') {
+
+    // Auto-auth when embedded in Lovable iframe
+    // Lovable posts {type:'auto_auth', password:'ckagent2026'} on load
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'auto_auth') {
+        const correct = btoa(event.data.password + ':ck2026') === ENCODED_PW;
+        if (correct && sessionStorage.getItem('ck_auth') !== '1') {
+          sessionStorage.setItem('ck_auth', '1');
+          document.getElementById('loginGate').style.display = 'none';
+          document.getElementById('appWrapper').classList.add('visible');
+          loadKnowledgeBase();
+        }
+      }
+    });    if (sessionStorage.getItem('ck_auth') === '1') {
       document.getElementById('loginGate').style.display = 'none';
       document.getElementById('appWrapper').classList.add('visible');
       loadKnowledgeBase();
