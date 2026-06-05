@@ -1403,6 +1403,7 @@ ${retailerCache}`;
     else if (toolName === 'create_and_send') {
       const n8nWebhook = 'https://ckmarketingauto.app.n8n.cloud/webhook/launch-campaign-v2';
       const campaignDbId = `agent_${Date.now()}`;
+      const user = getCurrentUser();
       const resp = await fetch(n8nWebhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1467,8 +1468,8 @@ ${retailerCache}`;
           pn_body: toolInput.pn_body,
           deep_link: toolInput.deep_link,
           status: 'Approved',
-          created_by_name: 'Campaign Agent',
-          notes: 'Created via Campaign Agent chatbot'
+          created_by_name: getCurrentUser().name,
+          notes: `Created via Campaign Agent by ${getCurrentUser().email}`
         }
       });
       return { ...result, scheduled_date: schedDate, scheduled_time: schedTime };
@@ -1934,6 +1935,15 @@ ${retailerCache}`;
   // ============================================================
   // MAIN SEND FUNCTION
   // ============================================================
+
+  // Get current user identity (from Lovable session or default)
+  function getCurrentUser() {
+    return {
+      email: sessionStorage.getItem('ck_user_email') || 'Campaign Agent',
+      name: sessionStorage.getItem('ck_user_name') || 'Campaign Agent'
+    };
+  }
+  // ============================================================
   async function sendMessage(text) {
     const input = document.getElementById('input');
     const userText = text || input.value.trim();
@@ -2249,14 +2259,27 @@ ${retailerCache}`;
     }
 
     // Auto-auth when embedded in Lovable iframe
-    // Lovable posts {type:'auto_auth', password:'ckagent2026'} on load
+    // Lovable posts {type:'auto_auth', password:'ckagent2026', email:'user@cashkaro.com'} on load
+    let loggedInEmail = '';
+    let loggedInName = '';
+
     window.addEventListener('message', (event) => {
       if (event.data?.type === 'auto_auth') {
         const correct = btoa(event.data.password + ':ck2026') === ENCODED_PW;
         if (correct && sessionStorage.getItem('ck_auth') !== '1') {
+          // Store user identity from Lovable
+          loggedInEmail = event.data.email || '';
+          loggedInName = event.data.name || event.data.email?.split('@')[0] || 'Campaign Agent';
           sessionStorage.setItem('ck_auth', '1');
+          sessionStorage.setItem('ck_user_email', loggedInEmail);
+          sessionStorage.setItem('ck_user_name', loggedInName);
           document.getElementById('loginGate').style.display = 'none';
           document.getElementById('appWrapper').classList.add('visible');
+          // Update avatar initials if name available
+          if (loggedInName) {
+            const initials = loggedInName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+            document.querySelectorAll('.message.user .avatar').forEach(a => a.textContent = initials);
+          }
           loadKnowledgeBase();
         }
       }
