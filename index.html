@@ -1516,7 +1516,7 @@ ${retailerCache}`;
   // ============================================================
   function renderToolResult(toolName, toolInput, result) {
     if (toolName === 'get_stats') {
-      const total = (result.total_android_reach || 0) + (result.total_ios_reach || 0);
+      const total = (parseInt(result.total_android_reach) || 0) + (parseInt(result.total_ios_reach) || 0);
       return `
         <div class="stat-block">
           <div class="stat-row"><span class="stat-label">Period</span><span class="stat-value">${(toolInput.period||'').replace(/_/g,' ')}</span></div>
@@ -1534,7 +1534,7 @@ ${retailerCache}`;
       const campaigns = result.campaigns || [];
       if (!campaigns.length) return '<em>No campaigns found.</em>';
       return campaigns.map(c => {
-        const reach = (c.android_reach || 0) + (c.ios_reach || 0);
+        const reach = (parseInt(c.android_reach) || 0) + (parseInt(c.ios_reach) || 0);
         const statusClass = {
           'Sent': 'tag-sent', 'Draft': 'tag-draft', 'Approved': 'tag-approved',
           'Failed': 'tag-failed', 'Pending Review': 'tag-pending'
@@ -1568,7 +1568,7 @@ ${retailerCache}`;
 
     if (toolName === 'create_and_send') {
       if (result.status === 'success') {
-        const total = (result.android_reach || 0) + (result.ios_reach || 0);
+        const total = (parseInt(result.android_reach) || 0) + (parseInt(result.ios_reach) || 0);
         return `
           <div class="action-result success">🚀 Campaign created and fired successfully!</div>
           <div class="stat-block">
@@ -1601,7 +1601,7 @@ ${retailerCache}`;
 
     if (toolName === 'fire_campaign_now') {
       if (result.status === 'success') {
-        const total = (result.android_reach || 0) + (result.ios_reach || 0);
+        const total = (parseInt(result.android_reach) || 0) + (parseInt(result.ios_reach) || 0);
         return `
           <div class="action-result success">🚀 Campaign fired successfully!</div>
           <div class="stat-block">
