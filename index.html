@@ -1108,6 +1108,18 @@
       }
     },
     {
+      name: "estimate_reach",
+      description: "Estimate campaign reach BEFORE sending. Always call this after generating targeting_json and BEFORE showing the campaign review card. Shows how many Android and iOS users will receive the campaign.",
+      input_schema: {
+        type: "object",
+        properties: {
+          targeting_json: { type: "object", description: "CleverTap where JSON for targeting" },
+          channel: { type: "string", description: "push, email, sms, whatsapp — default push" }
+        },
+        required: ["targeting_json"]
+      }
+    },
+    {
       name: "save_to_knowledge_base",
       description: "Save a correction or new learning to the knowledge base so future responses are better. Call this when user confirms they want to save a correction.",
       input_schema: {
@@ -1245,9 +1257,22 @@ Format as numbered options with CTR data when available:
 Step 1 — Get brand → call get_retailer → get deep link + rate
 Step 2 — Get goal (retention/acquisition/reactivation/flash sale etc.)
 Step 3 — Call get_segment_performance → show data-driven audience options
-Step 4 — User picks audience → generate segment JSON + CASHvertising copy using actual cashback rate
-Step 5 — Show review card → ask confirm
-Step 6 — Only after confirm → call create_and_send or create_and_schedule
+Step 4 — User picks audience → generate segment JSON + CASHvertising copy
+Step 5 — Call estimate_reach with the targeting_json → get Android + iOS reach
+Step 6 — Show review card WITH reach numbers:
+📋 CAMPAIGN REVIEW
+Brand: [brand]
+Target: [segment]
+Title: [title]
+Body: [body]
+Deep Link: [url]
+📊 Estimated Reach: [total] users (Android: X | iOS: Y)
+Send: [now / DATE at TIME IST]
+→ "Reply 'confirm' to send or tell me what to change."
+Step 7 — Only after "confirm" → call create_and_send or create_and_schedule
+
+IMPORTANT: estimate_reach is MANDATORY before every campaign review card.
+Never skip it. If estimate_reach fails, show "Reach: unavailable" but still show review.
 
 Review card format:
 📋 CAMPAIGN REVIEW
@@ -1493,6 +1518,17 @@ ${retailerCache}`;
       }
     }
 
+    else if (toolName === 'estimate_reach') {
+      return await callEdge({
+        action: 'estimate_reach',
+        campaign_payload: {
+          target_mode: toolInput.channel || 'push',
+          where: toolInput.targeting_json,
+          devices: ['android', 'ios']
+        }
+      });
+    }
+
     else if (toolName === 'get_retailer') {
       return await callEdge({ action: 'get_retailer', brand: toolInput.brand });
     }
@@ -1616,6 +1652,19 @@ ${retailerCache}`;
       return `<div class="action-result error">❌ Campaign failed to send.</div>`;
     }
 
+    if (toolName === 'estimate_reach') {
+      if (!result.success && result.error) {
+        return `<div class="action-result" style="background:rgba(255,255,255,0.03);border:1px solid var(--border);color:var(--text-muted)">📊 Reach estimate unavailable — ${result.error}</div>`;
+      }
+      const total = (parseInt(result.android) || 0) + (parseInt(result.ios) || 0);
+      return `
+        <div class="stat-block">
+          <div class="stat-row"><span class="stat-label" style="font-weight:600;color:var(--orange)">📊 Estimated Reach</span><span class="stat-value highlight" style="font-size:16px;font-weight:700">${total.toLocaleString('en-IN')} users</span></div>
+          <div class="stat-row"><span class="stat-label">Android</span><span class="stat-value">${(parseInt(result.android)||0).toLocaleString('en-IN')}</span></div>
+          <div class="stat-row"><span class="stat-label">iOS</span><span class="stat-value">${(parseInt(result.ios)||0).toLocaleString('en-IN')}</span></div>
+        </div>`;
+    }
+
     if (toolName === 'get_retailer') {
       if (!result.found) return `<div class="action-result error">❌ Retailer not found in database. You can add it in Lovable → Retailers page.</div>`;
       const r = result.retailer;
@@ -1683,6 +1732,7 @@ ${retailerCache}`;
       steps: [
         { key: 'get_retailer', label: 'Fetching retailer info', sub: 'deep link & cashback rate' },
         { key: 'get_segment_performance', label: 'Checking best audiences', sub: 'historical CTR data' },
+        { key: 'estimate_reach', label: 'Estimating reach', sub: 'querying CleverTap' },
         { key: 'create_and_send', label: 'Firing to CleverTap', sub: 'calling campaign API' },
         { key: 'done', label: 'Campaign is live!', sub: '' }
       ]
@@ -1692,6 +1742,7 @@ ${retailerCache}`;
       steps: [
         { key: 'get_retailer', label: 'Fetching retailer info', sub: 'deep link & cashback rate' },
         { key: 'get_segment_performance', label: 'Checking best audiences', sub: 'historical CTR data' },
+        { key: 'estimate_reach', label: 'Estimating reach', sub: 'querying CleverTap' },
         { key: 'create_and_schedule', label: 'Saving to schedule', sub: 'will auto-fire at set time' },
         { key: 'done', label: 'Scheduled successfully!', sub: '' }
       ]
