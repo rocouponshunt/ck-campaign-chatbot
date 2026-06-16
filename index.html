@@ -1401,7 +1401,39 @@ ${retailerCache}`;
     }
     else if (toolName === 'create_and_send') {
       const user = getCurrentUser();
-      // Fire directly via CleverTap edge function — no n8n needed
+      // Step 1: Save campaign to Supabase first to get a DB ID
+      let campaignDbId = null;
+      try {
+        const saved = await callEdge({
+          action: 'create_campaign',
+          campaign: {
+            date: todayIST(),
+            time: new Date().toTimeString().slice(0,5),
+            channel: toolInput.channel || 'push',
+            brand: toolInput.brand,
+            segment_name: toolInput.segment_name,
+            segment_json: toolInput.targeting_json,
+            pn_title: toolInput.pn_title,
+            pn_body: toolInput.pn_body,
+            deep_link: toolInput.deep_link,
+            status: 'Draft',
+            created_by_name: user.name,
+            notes: `Created via Campaign Agent by ${user.email}`
+          }
+        });
+        campaignDbId = saved?.campaign_id;
+      } catch(e) {
+        console.log('Pre-save skipped:', e.message);
+      }
+      // Step 2: Fire via fire_campaign_direct using the saved campaign ID
+      if (campaignDbId) {
+        const result = await callEdge({
+          action: 'fire_campaign_direct',
+          campaign_id: campaignDbId
+        });
+        return result;
+      }
+      // Fallback: pass full payload if no DB ID
       const result = await callEdge({
         action: 'fire_campaign_direct',
         campaign_payload: {
@@ -1412,10 +1444,7 @@ ${retailerCache}`;
           pn_title: toolInput.pn_title,
           pn_body: toolInput.pn_body,
           deep_link: toolInput.deep_link,
-          created_by_name: user.name,
-          created_by_email: user.email,
-          date: todayIST(),
-          time: new Date().toTimeString().slice(0,5)
+          created_by_name: user.name
         }
       });
       return result;
