@@ -1392,47 +1392,19 @@ ${retailerCache}`;
       return await callEdge({ action: 'cancel_campaign', campaign_id: toolInput.campaign_id });
     }
     else if (toolName === 'fire_campaign_now') {
-      const detail = await callEdge({ action: 'get_campaign_detail', campaign_id: toolInput.campaign_id });
-      if (!detail || !detail.id) return { error: 'Campaign not found' };
-
-      const n8nWebhook = 'https://ckmarketingauto.app.n8n.cloud/webhook/launch-campaign-v2';
-      const resp = await fetch(n8nWebhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel: detail.channel,
-          brand: detail.brand,
-          segment_name: detail.segment_name,
-          targeting_json: detail.segment_json,
-          pn_title: detail.pn_title,
-          pn_body: detail.pn_body,
-          deep_link: detail.deep_link,
-          campaign_db_id: detail.id,
-          created_by: detail.created_by_name
-        })
+      // Fire directly via CleverTap edge function — no n8n needed
+      const result = await callEdge({
+        action: 'fire_campaign_direct',
+        campaign_id: toolInput.campaign_id
       });
-      const result = await resp.json();
-
-      if (result.status === 'success') {
-        await callEdge({
-          action: 'update_campaign_after_send',
-          campaign_id: detail.id,
-          campaign_id_ct: result.campaign_id,
-          android_reach: result.android_reach,
-          ios_reach: result.ios_reach,
-          ct_campaign_url: result.url
-        });
-      }
       return result;
     }
     else if (toolName === 'create_and_send') {
-      const n8nWebhook = 'https://ckmarketingauto.app.n8n.cloud/webhook/launch-campaign-v2';
-      const campaignDbId = `agent_${Date.now()}`;
       const user = getCurrentUser();
-      const resp = await fetch(n8nWebhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Fire directly via CleverTap edge function — no n8n needed
+      const result = await callEdge({
+        action: 'fire_campaign_direct',
+        campaign_payload: {
           channel: toolInput.channel || 'push',
           brand: toolInput.brand,
           segment_name: toolInput.segment_name,
@@ -1440,40 +1412,12 @@ ${retailerCache}`;
           pn_title: toolInput.pn_title,
           pn_body: toolInput.pn_body,
           deep_link: toolInput.deep_link,
-          campaign_db_id: campaignDbId,
-          created_by: 'Campaign Agent'
-        })
+          created_by_name: user.name,
+          created_by_email: user.email,
+          date: todayIST(),
+          time: new Date().toTimeString().slice(0,5)
+        }
       });
-      const result = await resp.json();
-
-      // Save to Supabase regardless of result so it appears in Lovable
-      try {
-        await callEdge({
-          action: 'create_campaign',
-          campaign: {
-            date: todayIST(),
-            time: new Date().toTimeString().slice(0,5),
-            channel: toolInput.channel || 'push',
-            brand: toolInput.brand,
-            segment_name: toolInput.segment_name,
-            segment_json: toolInput.targeting_json,
-            pn_title: toolInput.pn_title,
-            pn_body: toolInput.pn_body,
-            deep_link: toolInput.deep_link,
-            status: result.status === 'success' ? 'Sent' : 'Failed',
-            created_by_name: 'Campaign Agent',
-            notes: 'Created via Campaign Agent chatbot',
-            campaign_id_ct: result.campaign_id || result.id || '',
-            android_reach: result.android_reach || 0,
-            ios_reach: result.ios_reach || 0,
-            ct_campaign_url: result.url || ''
-          }
-        });
-      } catch(e) {
-        // Edge function may not have create_campaign yet — will be added tomorrow via Lovable
-        console.log('Supabase save skipped (create_campaign not yet in edge function):', e.message);
-      }
-
       return result;
     }
 
