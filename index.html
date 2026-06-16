@@ -1577,21 +1577,22 @@ ${retailerCache}`;
     }
 
     if (toolName === 'create_and_send') {
-      if (result.status === 'success') {
+      const isSuccess1 = result.status === 'success' || result.success === true;
+      if (isSuccess1) {
         const total = (parseInt(result.android_reach) || 0) + (parseInt(result.ios_reach) || 0);
         return `
           <div class="action-result success">🚀 Campaign created and fired successfully!</div>
           <div class="stat-block">
             <div class="stat-row"><span class="stat-label">Brand</span><span class="stat-value">${toolInput.brand}</span></div>
             <div class="stat-row"><span class="stat-label">Title</span><span class="stat-value">${toolInput.pn_title}</span></div>
-            <div class="stat-row"><span class="stat-label">CT Campaign ID</span><span class="stat-value highlight">${result.campaign_id || result.id}</span></div>
-            <div class="stat-row"><span class="stat-label">Android Reach</span><span class="stat-value">${(result.android_reach||0).toLocaleString('en-IN')}</span></div>
-            <div class="stat-row"><span class="stat-label">iOS Reach</span><span class="stat-value">${(result.ios_reach||0).toLocaleString('en-IN')}</span></div>
+            <div class="stat-row"><span class="stat-label">CT Campaign ID</span><span class="stat-value highlight">${result.campaign_id_ct || result.campaign_id || result.id}</span></div>
+            <div class="stat-row"><span class="stat-label">Android Reach</span><span class="stat-value">${(parseInt(result.android_reach)||0).toLocaleString('en-IN')}</span></div>
+            <div class="stat-row"><span class="stat-label">iOS Reach</span><span class="stat-value">${(parseInt(result.ios_reach)||0).toLocaleString('en-IN')}</span></div>
             <div class="stat-row"><span class="stat-label">Total Reach</span><span class="stat-value highlight">${total.toLocaleString('en-IN')}</span></div>
           </div>
-          ${result.url ? `<a href="${result.url}" target="_blank" class="ct-link">↗ View in CleverTap</a>` : ''}`;
+          ${(result.url || result.ct_campaign_url) ? `<a href="${result.url || result.ct_campaign_url}" target="_blank" class="ct-link">↗ View in CleverTap</a>` : ''}`;
       }
-      return `<div class="action-result error">❌ Campaign failed to send: ${result.error || JSON.stringify(result)}</div>`;
+      return `<div class="action-result error">❌ Campaign failed to send: ${result.error || result.message || ''}</div>`;
     }
 
     if (toolName === 'create_and_schedule') {
@@ -1610,19 +1611,20 @@ ${retailerCache}`;
     }
 
     if (toolName === 'fire_campaign_now') {
-      if (result.status === 'success') {
+      const isSuccessFire = result.status === 'success' || result.success === true;
+      if (isSuccessFire) {
         const total = (parseInt(result.android_reach) || 0) + (parseInt(result.ios_reach) || 0);
         return `
           <div class="action-result success">🚀 Campaign fired successfully!</div>
           <div class="stat-block">
-            <div class="stat-row"><span class="stat-label">CT Campaign ID</span><span class="stat-value highlight">${result.campaign_id}</span></div>
-            <div class="stat-row"><span class="stat-label">Android Reach</span><span class="stat-value">${(result.android_reach||0).toLocaleString('en-IN')}</span></div>
-            <div class="stat-row"><span class="stat-label">iOS Reach</span><span class="stat-value">${(result.ios_reach||0).toLocaleString('en-IN')}</span></div>
+            <div class="stat-row"><span class="stat-label">CT Campaign ID</span><span class="stat-value highlight">${result.campaign_id_ct || result.campaign_id}</span></div>
+            <div class="stat-row"><span class="stat-label">Android Reach</span><span class="stat-value">${(parseInt(result.android_reach)||0).toLocaleString('en-IN')}</span></div>
+            <div class="stat-row"><span class="stat-label">iOS Reach</span><span class="stat-value">${(parseInt(result.ios_reach)||0).toLocaleString('en-IN')}</span></div>
             <div class="stat-row"><span class="stat-label">Total</span><span class="stat-value highlight">${total.toLocaleString('en-IN')}</span></div>
           </div>
           ${result.url ? `<a href="${result.url}" target="_blank" class="ct-link">↗ View in CleverTap</a>` : ''}`;
       }
-      return `<div class="action-result error">❌ Campaign failed to send.</div>`;
+      return `<div class="action-result error">❌ Campaign failed to send: ${result.error || result.message || ''}</div>`;
     }
 
     if (toolName === 'estimate_reach') {
