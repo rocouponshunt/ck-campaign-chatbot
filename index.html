@@ -931,7 +931,9 @@
   <div class="suggestion-chip" onclick="sendSuggestion('Stats this week')">📈 Stats this week</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show sent campaigns today')">✅ Sent today</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show pending approval campaigns')">⏳ Pending approval</div>
-  <div class="suggestion-chip" onclick="sendSuggestion('I want to create a new push campaign')">🚀 Create campaign</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('I want to create a push notification campaign')">🔔 Push campaign</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('I want to create an app inbox campaign')">📥 App Inbox</div>
+  <div class="suggestion-chip" onclick="sendSuggestion('I want to create an email campaign')">📧 Email campaign</div>
   <div class="suggestion-chip" onclick="sendSuggestion('I want to schedule a campaign for later')">📅 Schedule campaign</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show me all active retailers and their cashback rates')">🛍️ Retailers & rates</div>
   <div class="suggestion-chip" onclick="sendSuggestion('Show campaigns for Myntra')">🛍️ Myntra campaigns</div>
@@ -1078,14 +1080,17 @@
         type: "object",
         properties: {
           brand: { type: "string", description: "Brand/retailer name e.g. Myntra, Amazon, Ajio" },
-          channel: { type: "string", description: "push, email, sms, whatsapp — default push" },
-          pn_title: { type: "string", description: "Push notification title max 50 chars" },
-          pn_body: { type: "string", description: "Push notification body max 150 chars" },
-          deep_link: { type: "string", description: "Deep link URL e.g. https://cashkaro.com/stores/myntra" },
+          channel: { type: "string", description: "push (default), inbox (App Inbox), email, sms" },
+          pn_title: { type: "string", description: "Title/subject max 50 chars. For SMS: not needed." },
+          pn_body: { type: "string", description: "Body/message text. For SMS: max 160 chars." },
+          deep_link: { type: "string", description: "CTA URL from retailers table" },
           segment_name: { type: "string", description: "Plain English segment description" },
-          targeting_json: { type: "object", description: "CleverTap where JSON for targeting" }
+          targeting_json: { type: "object", description: "CleverTap where JSON for targeting" },
+          image_url: { type: "string", description: "Optional hosted image URL for push/inbox rich media" },
+          email_subject: { type: "string", description: "Email subject line (only for email channel)" },
+          sender_name: { type: "string", description: "Email sender name, default CashKaro (only for email)" }
         },
-        required: ["brand", "pn_title", "pn_body", "deep_link", "segment_name", "targeting_json"]
+        required: ["brand", "pn_body", "deep_link", "segment_name", "targeting_json"]
       }
     },
     {
@@ -1095,16 +1100,19 @@
         type: "object",
         properties: {
           brand: { type: "string", description: "Brand/retailer name" },
-          channel: { type: "string", description: "push, email, sms, whatsapp — default push" },
-          pn_title: { type: "string", description: "Push notification title max 50 chars" },
-          pn_body: { type: "string", description: "Push notification body max 150 chars" },
-          deep_link: { type: "string", description: "Deep link URL" },
+          channel: { type: "string", description: "push (default), inbox, email, sms" },
+          pn_title: { type: "string", description: "Title/subject max 50 chars. Not needed for SMS." },
+          pn_body: { type: "string", description: "Body text. For SMS: max 160 chars." },
+          deep_link: { type: "string", description: "CTA URL from retailers table" },
           segment_name: { type: "string", description: "Plain English segment description" },
           targeting_json: { type: "object", description: "CleverTap where JSON for targeting" },
+          image_url: { type: "string", description: "Optional hosted image URL for push/inbox" },
+          email_subject: { type: "string", description: "Email subject line (email channel only)" },
+          sender_name: { type: "string", description: "Email sender name (email channel only)" },
           scheduled_date: { type: "string", description: "Date YYYY-MM-DD, default today" },
           scheduled_time: { type: "string", description: "Time HH:MM IST, default 18:00" }
         },
-        required: ["brand", "pn_title", "pn_body", "deep_link", "segment_name", "targeting_json"]
+        required: ["brand", "pn_body", "deep_link", "segment_name", "targeting_json"]
       }
     },
     {
@@ -1233,6 +1241,49 @@ If user corrects any output (wrong JSON, wrong segment, wrong copy, wrong dates)
 2. Ask: "Got it! Should I save this to the knowledge base so I always get this right? Reply 'save it'."
 3. If user says "save it" / "yes save" / "haan save karo" → call save_to_knowledge_base
 
+## CHANNEL RULES — CRITICAL
+
+CK Campaign Hub supports 4 channels. Always ask user which channel 
+if not specified. Default is Push Notification.
+
+### Push Notification (channel: "push")
+- Needs: pn_title (max 50 chars), pn_body (max 150 chars), deep_link
+- Optional: image_url (hosted image URL for rich push)
+- Android image field: wzrk_bi | iOS: media.url
+- Copy style: urgent, punchy, emoji OK
+
+### App Inbox (channel: "inbox")
+- Persistent message in app notification center
+- Needs: pn_title, pn_body, deep_link (tap action URL)
+- Optional: image_url
+- Copy style: slightly longer, more informative than push
+- NO devices array needed
+
+### Email (channel: "email")
+- Needs: email_subject, pn_body (main body text), deep_link
+- pn_title = email heading shown in template
+- Optional: sender_name (default: CashKaro)
+- Copy style: formal, complete sentences, no emoji in subject
+- Template auto-applies CashKaro HTML branding
+- Always generate an email_subject separately from pn_title
+
+### SMS (channel: "sms")  
+- CURRENTLY DISABLED — pending DLT approval
+- If user asks for SMS: explain it is disabled and suggest push or email instead
+- Max 160 chars body
+- No title field for SMS
+
+## CHANNEL COPY RULES
+- Push: "Flat 10% Cashback on Myntra! 🛍️ Shop now →" (punchy, emoji)
+- Inbox: "Exclusive Myntra offer: Earn flat 10% Cashback on your next order. Valid today only." (informative)
+- Email subject: "Your exclusive Myntra Cashback offer is here" (no emoji, sentence case)
+- Email body: 2-3 sentences, professional tone, clear CTA
+
+## IMAGE URL RULE
+Only ask for image_url if user explicitly mentions "with image" or "rich push" 
+or "add a banner". Never require it — it is always optional.
+If provided, include in payload. If not, skip entirely.
+
 ## RETAILER DATA RULE — CRITICAL
 ALWAYS call get_retailer tool BEFORE creating any campaign for a specific brand.
 Never guess or make up deep links or cashback rates.
@@ -1254,25 +1305,37 @@ Format as numbered options with CTR data when available:
 🥉 Option 3: [segment] — New audience, no data yet
 
 ## Create Campaign Workflow (UPDATED)
-Step 1 — Get brand → call get_retailer → get deep link + rate
+Step 0 — If channel not specified, ask: Push / App Inbox / Email / SMS
+         SMS: immediately explain disabled, suggest push or email
+Step 1 — Get brand → call get_retailer → get deep link + cashback rate
 Step 2 — Get goal (retention/acquisition/reactivation/flash sale etc.)
 Step 3 — Call get_segment_performance → show data-driven audience options
-Step 4 — User picks audience → generate segment JSON + CASHvertising copy
-Step 5 — Call estimate_reach with the targeting_json → get Android + iOS reach
-Step 6 — Show review card WITH reach numbers:
+Step 4 — User picks audience → generate segment JSON
+Step 5 — Generate copy based on channel rules above:
+         Push: punchy title + body with emoji
+         Inbox: informative title + body
+         Email: separate email_subject + heading + body text
+         SMS: single body text max 160 chars (but warn it's disabled)
+Step 6 — If push/inbox: call estimate_reach → get reach numbers
+         If email/SMS: skip estimate_reach (CT doesn't return device reach for these)
+Step 7 — Show review card:
+
 📋 CAMPAIGN REVIEW
+Channel: [Push/App Inbox/Email/SMS]
 Brand: [brand]
-Target: [segment]
-Title: [title]
+Target: [segment] — Est. Reach: [X users] (push/inbox only)
+[For push/inbox] Title: [title]
+[For email] Subject: [email_subject] | Heading: [pn_title]
 Body: [body]
-Deep Link: [url]
-📊 Estimated Reach: [total] users (Android: X | iOS: Y)
+[For email] Sender: CashKaro
+CTA URL: [deep_link]
+[If image] Image: [url]
 Send: [now / DATE at TIME IST]
 → "Reply 'confirm' to send or tell me what to change."
-Step 7 — Only after "confirm" → call create_and_send or create_and_schedule
 
-IMPORTANT: estimate_reach is MANDATORY before every campaign review card.
-Never skip it. If estimate_reach fails, show "Reach: unavailable" but still show review.
+Step 8 — Only after explicit "confirm" → call create_and_send or create_and_schedule
+
+IMPORTANT: estimate_reach only for push and inbox. Skip for email and SMS.
 
 Review card format:
 📋 CAMPAIGN REVIEW
@@ -1413,9 +1476,12 @@ ${retailerCache}`;
             brand: toolInput.brand,
             segment_name: toolInput.segment_name,
             segment_json: toolInput.targeting_json,
-            pn_title: toolInput.pn_title,
+            pn_title: toolInput.pn_title || toolInput.email_subject || '',
             pn_body: toolInput.pn_body,
             deep_link: toolInput.deep_link,
+            image_url: toolInput.image_url || '',
+            email_subject: toolInput.email_subject || toolInput.pn_title || '',
+            sender_name: toolInput.sender_name || 'CashKaro',
             status: 'Draft',
             created_by_name: user.name,
             notes: `Created via Campaign Agent by ${user.email}`
@@ -1703,13 +1769,32 @@ ${retailerCache}`;
   // Maps tool sequences to human-readable task flows
   const TASK_FLOWS = {
     create_campaign: {
-      title: '🚀 Creating Campaign',
+      title: '🔔 Creating Push Campaign',
       steps: [
         { key: 'get_retailer', label: 'Fetching retailer info', sub: 'deep link & cashback rate' },
         { key: 'get_segment_performance', label: 'Checking best audiences', sub: 'historical CTR data' },
         { key: 'estimate_reach', label: 'Estimating reach', sub: 'querying CleverTap' },
         { key: 'create_and_send', label: 'Firing to CleverTap', sub: 'calling campaign API' },
         { key: 'done', label: 'Campaign is live!', sub: '' }
+      ]
+    },
+    create_inbox: {
+      title: '📥 Creating App Inbox Campaign',
+      steps: [
+        { key: 'get_retailer', label: 'Fetching retailer info', sub: 'deep link & cashback rate' },
+        { key: 'get_segment_performance', label: 'Checking best audiences', sub: 'historical CTR data' },
+        { key: 'estimate_reach', label: 'Estimating reach', sub: 'querying CleverTap' },
+        { key: 'create_and_send', label: 'Sending to App Inbox', sub: 'calling campaign API' },
+        { key: 'done', label: 'Inbox message sent!', sub: '' }
+      ]
+    },
+    create_email: {
+      title: '📧 Creating Email Campaign',
+      steps: [
+        { key: 'get_retailer', label: 'Fetching retailer info', sub: 'deep link & cashback rate' },
+        { key: 'get_segment_performance', label: 'Checking best audiences', sub: 'historical CTR data' },
+        { key: 'create_and_send', label: 'Sending email campaign', sub: 'via Netcore PepiPost' },
+        { key: 'done', label: 'Email campaign live!', sub: '' }
       ]
     },
     schedule_campaign: {
@@ -1813,8 +1898,15 @@ ${retailerCache}`;
   };
 
   // Detect flow from FIRST tool called in a message
-  function detectFlow(toolName) {
-    if (toolName === 'create_and_send') return 'create_campaign';
+  // channel context is set when Claude calls create_and_send
+  let _pendingChannel = 'push';
+  function detectFlow(toolName, toolInput) {
+    if (toolName === 'create_and_send') {
+      const ch = (toolInput && toolInput.channel) || _pendingChannel || 'push';
+      if (ch === 'inbox') return 'create_inbox';
+      if (ch === 'email') return 'create_email';
+      return 'create_campaign';
+    }
     if (toolName === 'create_and_schedule') return 'schedule_campaign';
     if (toolName === 'get_stats') return 'check_stats';
     if (toolName === 'get_all_retailers') return 'check_retailers';
@@ -1832,10 +1924,15 @@ ${retailerCache}`;
   }
 
   // Upgrade flow mid-execution when we learn more about what Claude is doing
-  function upgradeFlow(currentFlowKey, newToolName) {
-    // If we started with retailer lookup and now creating → upgrade to create flow
+  function upgradeFlow(currentFlowKey, newToolName, toolInput) {
+    // If we started with retailer lookup and now creating → upgrade to correct channel flow
     if (currentFlowKey === 'check_retailer' && newToolName === 'get_segment_performance') return 'create_campaign';
-    if (currentFlowKey === 'check_retailer' && newToolName === 'create_and_send') return 'create_campaign';
+    if (currentFlowKey === 'check_retailer' && newToolName === 'create_and_send') {
+      const ch = (toolInput && toolInput.channel) || 'push';
+      if (ch === 'inbox') return 'create_inbox';
+      if (ch === 'email') return 'create_email';
+      return 'create_campaign';
+    }
     if (currentFlowKey === 'check_retailer' && newToolName === 'create_and_schedule') return 'schedule_campaign';
     // If listing campaigns and then action follows → upgrade
     if (currentFlowKey === 'list_campaigns' && newToolName === 'approve_campaign') return 'approve_campaign';
@@ -2034,7 +2131,7 @@ ${retailerCache}`;
 
             // Init progress on FIRST tool — always, for every request
             if (!progressEl) {
-              currentFlowKey = detectFlow(block.name);
+              currentFlowKey = detectFlow(block.name, block.input);
               typingEl.remove();
               progressEl = document.createElement('div');
               progressEl.className = 'message agent';
@@ -2044,7 +2141,7 @@ ${retailerCache}`;
               tracker = new ProgressTracker(currentFlowKey, progressEl.querySelector('#progress_inner'));
             } else {
               // Check if we should upgrade the flow mid-execution
-              const upgraded = upgradeFlow(currentFlowKey, block.name);
+              const upgraded = upgradeFlow(currentFlowKey, block.name, block.input);
               if (upgraded) {
                 currentFlowKey = upgraded;
                 tracker.upgradeToFlow(upgraded);
