@@ -1260,12 +1260,17 @@ if not specified. Default is Push Notification.
 - NO devices array needed
 
 ### Email (channel: "email")
-- Needs: email_subject, pn_body (main body text), deep_link
+- Needs: email_subject, pn_body (main body text), deep_link, image_url
 - pn_title = email heading shown in template
 - Optional: sender_name (default: CashKaro)
 - Copy style: formal, complete sentences, no emoji in subject
 - Template auto-applies CashKaro HTML branding
 - Always generate an email_subject separately from pn_title
+- ALWAYS ask for image_url when creating email campaigns:
+  "Do you have a banner image URL for this email? 
+   (Paste the hosted image URL, or say 'no image' to skip)"
+- If user says "no image" or skips → proceed without image_url
+- Image appears as hero banner at top of email above CTA button
 
 ### SMS (channel: "sms")  
 - CURRENTLY DISABLED — pending DLT approval
@@ -1315,6 +1320,8 @@ Step 5 — Generate copy based on channel rules above:
          Push: punchy title + body with emoji
          Inbox: informative title + body
          Email: separate email_subject + heading + body text
+                ALWAYS ask: "Do you have a banner image URL for this email?
+                Paste the hosted URL or say 'no image' to skip."
          SMS: single body text max 160 chars (but warn it's disabled)
 Step 6 — If push/inbox: call estimate_reach → get reach numbers
          If email/SMS: skip estimate_reach (CT doesn't return device reach for these)
@@ -1329,7 +1336,7 @@ Target: [segment] — Est. Reach: [X users] (push/inbox only)
 Body: [body]
 [For email] Sender: CashKaro
 CTA URL: [deep_link]
-[If image] Image: [url]
+[For email — ALWAYS show] Image: [url if provided, else "No banner image — text only email"]
 Send: [now / DATE at TIME IST]
 → "Reply 'confirm' to send or tell me what to change."
 
